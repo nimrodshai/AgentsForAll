@@ -3,10 +3,11 @@ const AUTH_SESSION_KEY = `${STORAGE_PREFIX}.portal.auth-session`;
 const AUTH_CHALLENGE_KEY = `${STORAGE_PREFIX}.portal.auth-challenge`;
 const CLIENT_STATE_PREFIX = `${STORAGE_PREFIX}.client-state`;
 const LAST_PRIMARY_TAB_KEY = `${STORAGE_PREFIX}.portal.last-primary-tab`;
-// Keep the demo code hint limited to local/dev previews.
+// Keep the demo code hint available on local/dev previews and GitHub Pages demos.
 const DEMO_MODE =
   window.location.protocol === "file:" ||
-  ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname) ||
+  window.location.hostname.endsWith(".github.io");
 const OTP_TTL_MS = 10 * 60 * 1000;
 const SETTINGS_PANEL_ANIMATION_MS = 320;
 const VALID_TABS = new Set(["features", "preview", "simulator", "settings"]);
