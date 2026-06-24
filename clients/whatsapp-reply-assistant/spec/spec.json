@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "title": "Project Scope Spec",
+    "client_name": "Current client",
+    "project_name": "WhatsApp Business Reply Suggestion Assistant",
+    "prepared_by": "Codex",
+    "date": "2026-06-24",
+    "status": "Draft",
+    "language": "en"
+  },
+  "overview": {
+    "client_request": "The client wants a reply assistant for WhatsApp Business conversations. It should read the current thread, understand the context, draft a reply suggestion in the owner’s tone, and leave the final send action to the owner."
+  },
+  "sections": {
+    "deliverables": [
+      "A WhatsApp bot for reviewing incoming customer messages and surfacing reply suggestions.",
+      "A private workspace for editing the assistant's tone and knowledge.",
+      "A reply suggestion drafted from the current WhatsApp conversation."
+    ],
+    "workflow": [
+      "A customer sends a message in WhatsApp Business.",
+      "The WhatsApp bot captures the new message and loads the thread context.",
+      "The assistant uses the configured tone and knowledge from the private workspace to draft one suggested reply.",
+      "The WhatsApp bot shows the suggested reply drafted by the assistant.",
+      "The owner reviews and edits the suggestion.",
+      "The owner sends the final reply manually in WhatsApp Business."
+    ]
+  }
+}

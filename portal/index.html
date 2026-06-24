@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in · Agents For All</title>
+    <meta
+      name="description"
+      content="Enter your email to receive a one-time code and continue into the workspace."
+    />
+    <link rel="stylesheet" href="./styles.css?v=26" />
+  </head>
+  <body data-view="auth">
+    <div class="orb orb-left" aria-hidden="true"></div>
+    <div class="orb orb-right" aria-hidden="true"></div>
+    <div class="mesh" aria-hidden="true"></div>
+
+    <main id="authView" class="auth-shell">
+      <section class="auth-story">
+        <div class="auth-story-head">
+          <p class="eyebrow">Agents For All</p>
+          <h1>Let your agent do the boring stuff.</h1>
+          <p class="lede">
+            Keep your mind on growing the business.
+          </p>
+        </div>
+      </section>
+
+      <section id="authCard" class="auth-card glass-card" data-auth-stage="email">
+        <div class="auth-swap">
+          <label class="field auth-stage-panel auth-email-panel" id="emailPanel">
+            <span>Email address</span>
+            <div class="auth-input-surface">
+              <input
+                id="emailInput"
+                type="email"
+                autocomplete="email"
+                placeholder="name@company.com"
+              />
+            </div>
+          </label>
+
+          <div
+            id="otpPanel"
+            class="auth-stage-panel auth-code-panel"
+            aria-hidden="true"
+          >
+            <label class="field">
+              <span>One-time code</span>
+              <div class="otp-grid" role="group" aria-label="One-time code">
+                <input
+                  id="otpDigit1"
+                  class="otp-digit"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="1"
+                  aria-label="Code digit 1"
+                />
+                <input
+                  id="otpDigit2"
+                  class="otp-digit"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  aria-label="Code digit 2"
+                />
+                <input
+                  id="otpDigit3"
+                  class="otp-digit"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  aria-label="Code digit 3"
+                />
+                <input
+                  id="otpDigit4"
+                  class="otp-digit"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  aria-label="Code digit 4"
+                />
+                <input
+                  id="otpDigit5"
+                  class="otp-digit"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  aria-label="Code digit 5"
+                />
+                <input
+                  id="otpDigit6"
+                  class="otp-digit"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="1"
+                  aria-label="Code digit 6"
+                />
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button class="primary-button auth-submit-button" id="sendCodeButton" type="button">
+          <span class="button-label button-label-login" aria-hidden="true">Log in</span>
+          <span class="button-label button-label-verify" aria-hidden="true">Verify code</span>
+        </button>
+
+        <p id="authMessage" class="auth-message">We’ll send a code to your email.</p>
+
+        <div class="auth-actions">
+          <button id="changeEmailButton" class="text-button" type="button">
+            Use a different email
+          </button>
+        </div>
+
+        <p id="demoCodeText" class="demo-note is-hidden"></p>
+      </section>
+    </main>
+
+    <section id="appView" class="app-shell is-hidden">
+      <header class="app-bar">
+        <div class="brand-block">
+          <p class="eyebrow">Agents For All</p>
+        </div>
+
+        <nav class="tab-strip" aria-label="Workspace tabs">
+          <button class="tab-button is-active" data-tab="features" type="button">Features</button>
+          <button class="tab-button" data-tab="preview" type="button">Preview</button>
+        </nav>
+
+        <div class="topbar-actions">
+          <span id="saveState" class="status-pill">
+            <span class="status-dot"></span>
+            Autosaved locally
+          </span>
+
+          <div class="menu-wrap">
+            <button
+              id="accountMenuButton"
+              class="menu-button"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="accountMenu"
+            >
+              <span id="accountAvatar" class="avatar">DH</span>
+              <span class="menu-copy">
+                <span class="menu-label">Account</span>
+                <strong id="accountLabel">demo@handyman.com</strong>
+              </span>
+              <span class="menu-caret" aria-hidden="true">▾</span>
+            </button>
+
+            <div id="accountMenu" class="menu-popover is-hidden" role="menu">
+              <button class="menu-item" type="button" data-menu-action="account">Account</button>
+              <button class="menu-item" type="button" data-menu-action="settings">Settings</button>
+              <div class="menu-divider" aria-hidden="true"></div>
+              <button class="menu-item danger" type="button" data-menu-action="logout">
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="featuresPanel" class="tab-panel">
+        <div class="panel-intro">
+          <div>
+            <h1>Features</h1>
+          </div>
+        </div>
+
+        <div id="featureList" class="feature-list-grid"></div>
+      </section>
+
+      <section id="featureStudioPanel" class="tab-panel is-hidden">
+        <div class="studio-hero glass-card">
+          <div class="studio-hero-top">
+            <button id="backToFeaturesButton" class="ghost-button small" type="button">
+              Back to features
+            </button>
+            <span id="featureStudioStatus" class="feature-status">Active</span>
+          </div>
+
+          <p class="eyebrow">Feature studio</p>
+          <h1 id="featureStudioTitle">Feature name</h1>
+          <p id="featureStudioDescription" class="lede compact">
+            Feature details appear here.
+          </p>
+
+          <div class="feature-meta studio-meta">
+            <span id="featureStudioChannel">Channel: Web</span>
+            <span id="featureStudioMode">Mode: Default</span>
+          </div>
+        </div>
+
+        <div class="studio-fields">
+          <article class="glass-card config-card">
+            <div class="card-head">
+              <h3>Tone</h3>
+            </div>
+
+            <label class="field">
+              <span>How it should sound</span>
+              <textarea
+                id="toneGuidance"
+                rows="4"
+                placeholder="Warm, direct, and practical. Keep replies human, short, and grounded."
+              ></textarea>
+            </label>
+
+            <label class="field compact">
+              <span>Reply style</span>
+              <select id="responseStyle">
+                <option value="short">Short</option>
+                <option value="balanced">Balanced</option>
+                <option value="detailed">Detailed</option>
+              </select>
+            </label>
+          </article>
+
+          <article class="glass-card config-card">
+            <div class="card-head">
+              <h3>Reply rules</h3>
+            </div>
+
+            <label class="field">
+              <span>What it should do</span>
+              <textarea
+                id="replyRules"
+                rows="4"
+                placeholder="Acknowledge the request first. Ask one clarifying question only when needed. Never guess prices or availability."
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Escalation rules</span>
+              <textarea
+                id="escalationGuidance"
+                rows="3"
+                placeholder="Hand off when the customer is upset, the answer needs a human decision, or the request is urgent."
+              ></textarea>
+            </label>
+          </article>
+
+          <article class="glass-card config-card">
+            <div class="card-head">
+              <h3>Business context</h3>
+            </div>
+
+            <label class="field">
+              <span>What it should know</span>
+              <textarea
+                id="businessNotes"
+                rows="3"
+                placeholder="Service area, hours, pricing hints, and any details the agent should know before replying."
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Example replies</span>
+              <textarea
+                id="exampleReplies"
+                rows="4"
+                placeholder="Good: 'Yes, I can help. What is the address?'
+Bad: 'Sure, anything is possible.'"
+              ></textarea>
+            </label>
+          </article>
+
+          <article class="glass-card config-card">
+            <div class="card-head">
+              <h3>Approval handoff</h3>
+            </div>
+
+            <label class="field">
+              <span>How the bot should package the draft</span>
+              <textarea
+                id="approvalGuidance"
+                rows="4"
+                placeholder="When a WhatsApp message arrives, format the bot message with who sent it, the latest message, and one suggested reply. Keep send manual and make Edit open the hosted approval page with the draft prefilled."
+              ></textarea>
+            </label>
+
+            <label class="field compact">
+              <span>Edit URL</span>
+              <input
+                id="approvalUrlInput"
+                type="url"
+                placeholder="https://approval.example.com/review"
+              />
+            </label>
+          </article>
+        </div>
+      </section>
+
+      <section id="previewPanel" class="tab-panel is-hidden">
+        <div class="panel-intro">
+          <div>
+            <p class="eyebrow">Preview</p>
+            <h1>See the approval handoff before it goes live.</h1>
+            <p class="lede compact">
+              Clients can test a scenario, review the generated instruction, and copy
+              the compiled prompt if needed.
+            </p>
+          </div>
+        </div>
+
+        <div class="card-grid preview-grid">
+          <article class="glass-card preview-card">
+            <div class="card-head">
+              <h3>Choose a conversation</h3>
+            </div>
+
+            <label class="field compact">
+              <span>Test scenario</span>
+              <select id="scenarioSelect">
+                <option value="approval">WhatsApp approval bot example</option>
+                <option value="availability">New lead asking about availability</option>
+                <option value="pricing">Customer asking about price</option>
+                <option value="reschedule">Existing client wants to reschedule</option>
+                <option value="urgent">Urgent request that should escalate</option>
+              </select>
+            </label>
+
+            <div class="phone-shell">
+              <div class="phone-status">
+                <span id="approvalSender" class="phone-name">Jim Hopper</span>
+                <span class="phone-badge">WhatsApp style</span>
+              </div>
+
+              <div class="approval-thread">
+                <div class="approval-field">
+                  <span class="approval-label">Latest message</span>
+                  <div class="bubble incoming" id="scenarioMessage"></div>
+                </div>
+                <div class="approval-field">
+                  <span class="approval-label">Suggested reply</span>
+                  <div class="bubble outgoing" id="responseMessage"></div>
+                </div>
+              </div>
+
+              <div class="approval-actions">
+                <button class="primary-button small" type="button">Send</button>
+                <button class="ghost-button small" type="button">Edit</button>
+              </div>
+
+              <p id="approvalUrlNote" class="approval-note">
+                Edit opens the configured approval page.
+              </p>
+            </div>
+          </article>
+
+          <article class="glass-card preview-card">
+            <div class="card-head">
+              <h3>The instruction sent to the agent</h3>
+            </div>
+
+            <div class="preview-actions">
+              <button class="ghost-button" id="copyButton" type="button">Copy text</button>
+            </div>
+
+            <details class="prompt-details">
+              <summary>Show compiled prompt</summary>
+              <pre id="compiledPrompt"></pre>
+            </details>
+          </article>
+        </div>
+      </section>
+
+      <section
+        id="settingsPanel"
+        class="settings-overlay is-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settingsTitle"
+        aria-describedby="settingsDescription"
+      >
+        <div class="settings-dialog glass-card">
+          <div class="settings-head">
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h1 id="settingsTitle">Account and preferences</h1>
+              <p id="settingsDescription" class="lede compact">
+                Update login details and account preferences.
+              </p>
+            </div>
+
+            <button
+              id="closeSettingsButton"
+              class="settings-close"
+              type="button"
+              aria-label="Close settings"
+            >
+              ×
+            </button>
+          </div>
+
+          <div class="settings-switcher glass-card" role="tablist" aria-label="Settings sections">
+            <button class="subtab-button is-active" data-settings-mode="account" type="button">
+              Account
+            </button>
+            <button class="subtab-button" data-settings-mode="preferences" type="button">
+              Preferences
+            </button>
+          </div>
+
+          <div id="accountSettingsPane" class="settings-pane-grid">
+            <article class="glass-card settings-card">
+              <div class="detail-stack">
+                <div class="detail-row">
+                  <span class="detail-key">Email</span>
+                  <strong id="signedInEmail"></strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-key">Status</span>
+                  <strong>OTP protected</strong>
+                </div>
+              </div>
+
+              <div class="card-actions">
+                <button class="ghost-button danger" id="signOutButton" type="button">
+                  Log out
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <div id="preferencesSettingsPane" class="settings-pane-grid is-hidden">
+            <article class="glass-card settings-card">
+              <label class="field">
+                <span>Display name</span>
+                <input id="displayNameInput" type="text" placeholder="Handyman team" />
+              </label>
+
+              <label class="field">
+                <span>Workspace name</span>
+                <input id="workspaceNameInput" type="text" placeholder="Agent guidance studio" />
+              </label>
+
+              <label class="field">
+                <span>Time zone</span>
+                <select id="timezoneSelect">
+                  <option value="Asia/Jerusalem">Asia/Jerusalem</option>
+                  <option value="America/New_York">America/New York</option>
+                  <option value="America/Chicago">America/Chicago</option>
+                  <option value="America/Denver">America/Denver</option>
+                  <option value="America/Los_Angeles">America/Los Angeles</option>
+                  <option value="UTC">UTC</option>
+                </select>
+              </label>
+            </article>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <script src="./app.js?v=20"></script>
+  </body>
+</html>
