@@ -146,6 +146,7 @@ const state = {
   activeTab: "features",
   settingsMode: "account",
   settingsOpen: false,
+  authAlertOpen: false,
   menuOpen: false,
   selectedFeatureId: null,
   selectedSimulatorId: null,
@@ -154,10 +155,17 @@ const state = {
 
 let settingsPanelOpenFrame = null;
 let settingsPanelCloseTimer = null;
+let authAlertOpenFrame = null;
+let authAlertCloseTimer = null;
+let authAlertReturnFocus = null;
 
 const elements = {
   authView: document.querySelector("#authView"),
   authCard: document.querySelector("#authCard"),
+  authAlertOverlay: document.querySelector("#authAlertOverlay"),
+  authAlertTitle: document.querySelector("#authAlertTitle"),
+  authAlertMessage: document.querySelector("#authAlertMessage"),
+  authAlertDismissButton: document.querySelector("#authAlertDismissButton"),
   appView: document.querySelector("#appView"),
   emailInput: document.querySelector("#emailInput"),
   sendCodeButton: document.querySelector("#sendCodeButton"),
@@ -388,6 +396,151 @@ function syncAuthControls() {
   }
 }
 
+function stripTags(value) {
+  return String(value || "").replace(/<[^>]*>/g, " ");
+}
+
+function sanitizeErrorText(value) {
+  return stripTags(value).replace(/\s+/g, " ").trim();
+}
+
+function looksLikeHtml(value) {
+  const text = String(value || "").trim();
+  return /^<!doctype/i.test(text) || /^<html[\s>]/i.test(text) || /<\/[a-z][^>]*>/i.test(text);
+}
+
+function formatApiErrorMessage(error, fallback = "Something went wrong. Please try again.") {
+  const payloadRaw = String(error?.payload?.message || "");
+  const errorRaw = String(error?.message || "");
+
+  if (looksLikeHtml(payloadRaw) || looksLikeHtml(errorRaw)) {
+    if (error?.status) {
+      const statusText = sanitizeErrorText(error?.statusText || "").replace(/\.$/, "");
+      return statusText
+        ? `The server returned ${error.status} ${statusText}. Please try again.`
+        : `The server returned ${error.status}. Please try again.`;
+    }
+
+    return fallback;
+  }
+
+  const payloadMessage = sanitizeErrorText(payloadRaw);
+  const errorMessage = sanitizeErrorText(errorRaw);
+  const raw = payloadMessage || errorMessage;
+
+  if (raw && !looksLikeHtml(raw)) {
+    return raw;
+  }
+
+  if (error?.status) {
+    const statusText = sanitizeErrorText(error?.statusText || "").replace(/\.$/, "");
+    return statusText
+      ? `The server returned ${error.status} ${statusText}. Please try again.`
+      : `The server returned ${error.status}. Please try again.`;
+  }
+
+  return fallback;
+}
+
+function syncAuthAlertState() {
+  const overlay = elements.authAlertOverlay;
+  if (!overlay) {
+    return;
+  }
+
+  if (authAlertOpenFrame !== null) {
+    window.cancelAnimationFrame(authAlertOpenFrame);
+    authAlertOpenFrame = null;
+  }
+
+  if (authAlertCloseTimer !== null) {
+    window.clearTimeout(authAlertCloseTimer);
+    authAlertCloseTimer = null;
+  }
+
+  if (state.authAlertOpen) {
+    overlay.classList.remove("is-hidden");
+    document.body.dataset.modal = "alert";
+
+    if (!overlay.classList.contains("is-open")) {
+      authAlertOpenFrame = window.requestAnimationFrame(() => {
+        overlay.classList.add("is-open");
+        authAlertOpenFrame = null;
+      });
+    }
+
+    return;
+  }
+
+  overlay.classList.remove("is-open");
+
+  if (overlay.classList.contains("is-hidden")) {
+    if (document.body.dataset.modal === "alert") {
+      delete document.body.dataset.modal;
+    }
+    return;
+  }
+
+  authAlertCloseTimer = window.setTimeout(() => {
+    overlay.classList.add("is-hidden");
+    if (document.body.dataset.modal === "alert") {
+      delete document.body.dataset.modal;
+    }
+    authAlertCloseTimer = null;
+  }, 220);
+}
+
+function focusAuthAlertReturnTarget() {
+  if (authAlertReturnFocus === "otp") {
+    focusFirstEmptyOtpDigit();
+  } else {
+    elements.emailInput.focus();
+  }
+
+  authAlertReturnFocus = null;
+}
+
+function openAuthAlert(title, message, options = {}) {
+  if (elements.authAlertTitle) {
+    elements.authAlertTitle.textContent = String(title || "Sign-in error");
+  }
+
+  if (elements.authAlertMessage) {
+    elements.authAlertMessage.textContent = String(message || "Something went wrong. Please try again.");
+  }
+
+  authAlertReturnFocus = options.returnFocus || null;
+  state.authAlertOpen = true;
+  syncAuthAlertState();
+
+  window.requestAnimationFrame(() => {
+    elements.authAlertDismissButton?.focus();
+  });
+}
+
+function closeAuthAlert() {
+  if (!state.authAlertOpen) {
+    return;
+  }
+
+  state.authAlertOpen = false;
+  syncAuthAlertState();
+
+  const returnFocus = authAlertReturnFocus;
+  authAlertReturnFocus = null;
+
+  window.requestAnimationFrame(() => {
+    if (returnFocus === "otp") {
+      focusFirstEmptyOtpDigit();
+      return;
+    }
+
+    if (returnFocus === "email") {
+      elements.emailInput.focus();
+    }
+  });
+}
+
 async function apiRequest(path, options = {}) {
   const controller = new AbortController();
   const timeoutMs = Number(options.timeoutMs || 15000);
@@ -425,8 +578,14 @@ async function apiRequest(path, options = {}) {
     }
 
     if (!response.ok) {
-      const error = new Error(payload.message || response.statusText || "Request failed");
+      const error = new Error(formatApiErrorMessage({
+        status: response.status,
+        statusText: response.statusText,
+        payload,
+        message: text,
+      }));
       error.status = response.status;
+      error.statusText = response.statusText;
       error.payload = payload;
       throw error;
     }
@@ -1772,8 +1931,9 @@ async function startOtpFlow() {
     clearAuthChallenge();
     clearOtpDigits();
     renderAuth(typedEmail);
-    elements.authMessage.textContent = "Enter a valid email address first.";
-    elements.emailInput.focus();
+    openAuthAlert("Enter a valid email", "Use an email address like name@company.com.", {
+      returnFocus: "email",
+    });
     return;
   }
 
@@ -1798,8 +1958,8 @@ async function startOtpFlow() {
 
     clearAuthSession();
     authBusy = false;
+    closeAuthAlert();
     renderAuth(email);
-    elements.authMessage.textContent = `A 6-digit code was sent to ${email}.`;
     elements.demoCodeText.textContent = `Check ${email} for the code. It expires in 10 minutes.`;
     elements.demoCodeText.classList.remove("is-hidden");
     window.requestAnimationFrame(() => {
@@ -1809,8 +1969,11 @@ async function startOtpFlow() {
     authBusy = false;
     clearAuthChallenge();
     renderAuth(email);
-    elements.authMessage.textContent = error?.payload?.message || error?.message || "Could not send the code.";
-    elements.emailInput.focus();
+    openAuthAlert(
+      "Couldn’t send code",
+      formatApiErrorMessage(error, "We couldn’t send the code. Please try again."),
+      { returnFocus: "email" },
+    );
   }
 }
 
@@ -1834,6 +1997,7 @@ function completeSignIn(session) {
   };
   clearAuthChallenge();
   authBusy = false;
+  closeAuthAlert();
 
   persistJson(AUTH_SESSION_KEY, authSession);
 
@@ -1856,15 +2020,18 @@ async function verifyOtpFlow() {
   const email = normalizeEmail(elements.emailInput.value || authChallenge?.email || "");
 
   if (!authChallenge?.email) {
-    elements.authMessage.textContent = "Send a fresh code first.";
+    openAuthAlert("Send a fresh code", "Request a new code to continue.", {
+      returnFocus: "email",
+    });
     return;
   }
 
   if (authChallenge.expiresAt && Date.now() > authChallenge.expiresAt) {
     clearAuthChallenge();
     renderAuth(email);
-    elements.authMessage.textContent = "That code expired. Send a new one.";
-    elements.emailInput.focus();
+    openAuthAlert("Code expired", "That code expired. Request a new one.", {
+      returnFocus: "email",
+    });
     return;
   }
 
@@ -1898,18 +2065,27 @@ async function verifyOtpFlow() {
     syncAuthControls();
 
     const payload = error?.payload || {};
-    const message = payload.message || error?.message || "That code is not correct.";
+    const message = formatApiErrorMessage(error, "That code is not correct.");
 
     if (payload.error === "expired" || payload.error === "missing_challenge" || payload.error === "too_many_attempts") {
       clearAuthChallenge();
       renderAuth(email);
-      elements.authMessage.textContent = message;
-      elements.emailInput.focus();
+      openAuthAlert("Code expired", message, {
+        returnFocus: "email",
+      });
       return;
     }
 
-    elements.authMessage.textContent = message;
-    focusFirstEmptyOtpDigit();
+    if (payload.error === "incorrect") {
+      openAuthAlert("Incorrect code", message, {
+        returnFocus: "otp",
+      });
+      return;
+    }
+
+    openAuthAlert("Couldn’t verify code", message, {
+      returnFocus: "otp",
+    });
     return;
   }
 }
@@ -1942,7 +2118,7 @@ async function signOut() {
   clearHash();
   setView("auth");
   renderAuth(previousEmail);
-  elements.emailInput.focus();
+  closeAuthAlert();
 }
 
 function syncPromptField(key) {
@@ -2048,8 +2224,15 @@ function bindEvents() {
   elements.sendCodeButton.addEventListener("click", () => {
     void handlePrimaryAuthAction();
   });
+  elements.authAlertDismissButton.addEventListener("click", closeAuthAlert);
+  elements.authAlertOverlay.addEventListener("click", (event) => {
+    if (event.target === elements.authAlertOverlay) {
+      closeAuthAlert();
+    }
+  });
   elements.changeEmailButton.addEventListener("click", () => {
     clearAuthChallenge();
+    closeAuthAlert();
     clearOtpDigits();
     renderAuth();
     elements.emailInput.focus();
@@ -2098,6 +2281,11 @@ function bindEvents() {
 
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (state.authAlertOpen) {
+        closeAuthAlert();
+        return;
+      }
+
       if (state.settingsOpen) {
         closeSettings();
       } else {

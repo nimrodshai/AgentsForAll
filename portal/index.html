@@ -9,7 +9,7 @@
       content="Enter your email to receive a one-time code and continue into the workspace."
     />
     <meta name="portal-api-base" content="" />
-    <link rel="stylesheet" href="./styles.css?v=26" />
+    <link rel="stylesheet" href="./styles.css?v=27" />
   </head>
   <body data-view="auth">
     <div class="orb orb-left" aria-hidden="true"></div>
@@ -114,6 +114,34 @@
         </div>
 
         <p id="demoCodeText" class="demo-note is-hidden"></p>
+      </section>
+
+      <section
+        id="authAlertOverlay"
+        class="auth-alert-overlay is-hidden"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="authAlertTitle"
+        aria-describedby="authAlertMessage"
+      >
+        <div class="auth-alert-dialog glass-card">
+          <div class="auth-alert-head">
+            <div class="auth-alert-icon" aria-hidden="true">!</div>
+            <div class="auth-alert-copy">
+              <p class="eyebrow">Sign-in error</p>
+              <h2 id="authAlertTitle">Couldn’t send the code</h2>
+              <p id="authAlertMessage" class="lede compact">
+                We ran into a problem while sending your one-time code.
+              </p>
+            </div>
+          </div>
+
+          <div class="auth-alert-actions">
+            <button id="authAlertDismissButton" class="primary-button small" type="button">
+              OK
+            </button>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -608,6 +636,6 @@ Owner said afternoons are easier."
       </section>
     </section>
 
-    <script src="./app.js?v=24"></script>
+    <script src="./app.js?v=25"></script>
   </body>
 </html>
