@@ -17,24 +17,25 @@ It is intentionally separate from the reusable spec and client config layers.
 - `Simulator` for queuing browser-local WhatsApp mock messages, drafting a reply, and simulating send/edit actions without a backend
 - `Settings` opens as a modal overlay for account details and workspace preferences
 - The top-right menu opens account, settings, and log out actions
-- The simulator's Edit button opens [`/approval.html`](/Users/nimrodshai/Documents/Projects/AgentsForAll/approval.html), a reusable local approval page that accepts prefilled sender, message, and draft values.
+- The simulator's Edit button opens [`../approval.html`](../approval.html), a reusable local approval page that accepts prefilled sender, message, and draft values.
 
 ## Sign-in flow
 
 - Clients sign in with email and a one-time code.
-- This version uses a local demo OTP so the flow works without a backend.
-- The simulator is browser-local too, so it can be tested before any WhatsApp webhook or approval server exists.
-- Replace the demo OTP with a real email delivery and verification service before production.
+- The code is now issued by `scripts/run_portal_server.py` and verified by the server instead of being mocked in the browser.
+- Set `PORTAL_SMTP_HOST` and `PORTAL_SMTP_FROM_EMAIL` so the server can actually email the code.
+- The simulator is still browser-local, so it can be tested before any WhatsApp webhook or approval server exists.
 
 ## Local usage
 
-Serve the folder with a simple static server.
+Run the combined portal server so the UI and OTP API share the same origin.
 
 Example:
 
 ```bash
-cd portal
-python3 -m http.server 8000
+PORTAL_SMTP_HOST=smtp.example.com \
+PORTAL_SMTP_FROM_EMAIL=sign-in@example.com \
+python3 scripts/run_portal_server.py --port 8000
 ```
 
-Then visit `http://localhost:8000/`.
+Then visit `http://localhost:8000/portal/`.

@@ -3,19 +3,13 @@ const AUTH_SESSION_KEY = `${STORAGE_PREFIX}.portal.auth-session`;
 const AUTH_CHALLENGE_KEY = `${STORAGE_PREFIX}.portal.auth-challenge`;
 const CLIENT_STATE_PREFIX = `${STORAGE_PREFIX}.client-state`;
 const LAST_PRIMARY_TAB_KEY = `${STORAGE_PREFIX}.portal.last-primary-tab`;
-// Keep the demo code hint available on local/dev previews and GitHub Pages demos.
-const DEMO_MODE =
-  window.location.protocol === "file:" ||
-  ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname) ||
-  window.location.hostname.endsWith(".github.io");
+const PORTAL_API_BASE = resolvePortalApiBase();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const SETTINGS_PANEL_ANIMATION_MS = 320;
 const VALID_TABS = new Set(["features", "preview", "simulator", "settings"]);
 const TAB_ALIASES = new Map([["guidance", "features"]]);
 const VALID_SETTINGS_MODES = new Set(["account", "preferences"]);
 const LOCAL_APPROVAL_URL = "../approval.html";
-// Keep the local demo sign-in usable even before a tester types an email.
-const DEMO_AUTH_EMAIL = "demo@handyman.com";
 
 const DEFAULT_PROMPT = {
   toneGuidance: "Warm, direct, and practical. Keep replies human, short, and grounded.",
@@ -239,13 +233,24 @@ const elements = {
   timezoneSelect: document.querySelector("#timezoneSelect"),
 };
 
-let authSession = loadJson(AUTH_SESSION_KEY, null);
-let authChallenge = loadJson(AUTH_CHALLENGE_KEY, null);
-let activeEmail = normalizeEmail(authSession?.email || "");
+const storedAuthSession = loadJson(AUTH_SESSION_KEY, null);
+const storedAuthChallenge = loadJson(AUTH_CHALLENGE_KEY, null);
+let authSession = normalizeStoredSession(storedAuthSession);
+let authChallenge = normalizeStoredChallenge(storedAuthChallenge);
+let authBusy = false;
+let activeEmail = normalizeEmail(authSession?.email || authChallenge?.email || "");
 let clientState = loadClientState(activeEmail);
 state.selectedSimulatorId = clientState.simulator.selectedApprovalId || null;
 
-if (authSession?.signedIn) {
+if (storedAuthSession && !authSession) {
+  persistJson(AUTH_SESSION_KEY, null);
+}
+
+if (storedAuthChallenge && !authChallenge) {
+  persistJson(AUTH_CHALLENGE_KEY, null);
+}
+
+if (authChallenge && authChallenge.expiresAt && Date.now() > authChallenge.expiresAt) {
   authChallenge = null;
   persistJson(AUTH_CHALLENGE_KEY, null);
 }
@@ -281,6 +286,154 @@ function persistJson(key, value) {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // Keep the app usable when local storage is restricted.
+  }
+}
+
+function resolvePortalApiBase() {
+  const fromGlobal = window.PORTAL_API_BASE;
+  if (typeof fromGlobal === "string" && fromGlobal.trim()) {
+    return fromGlobal.trim().replace(/\/+$/, "");
+  }
+
+  const fromMeta = document.querySelector('meta[name="portal-api-base"]')?.content?.trim();
+  if (fromMeta) {
+    return fromMeta.replace(/\/+$/, "");
+  }
+
+  if (window.location.protocol === "file:" || window.location.origin === "null") {
+    return "http://127.0.0.1:8000";
+  }
+
+  return window.location.origin.replace(/\/+$/, "");
+}
+
+function normalizeStoredSession(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const email = normalizeEmail(value.email || "");
+  const token = String(value.token || "").trim();
+  if (!token || !validateEmail(email)) {
+    return null;
+  }
+
+  const expiresAt = Number(value.expiresAt || 0);
+  if (Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() > expiresAt) {
+    return null;
+  }
+
+  const signedInAt = Number(value.signedInAt || value.issuedAt || Date.now());
+  return {
+    email,
+    token,
+    signedIn: true,
+    signedInAt: Number.isFinite(signedInAt) ? signedInAt : Date.now(),
+    expiresAt: Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : 0,
+  };
+}
+
+function normalizeStoredChallenge(value) {
+  if (!value || typeof value !== "object" || "code" in value) {
+    return null;
+  }
+
+  const email = normalizeEmail(value.email || "");
+  if (!validateEmail(email)) {
+    return null;
+  }
+
+  const requestedAt = Number(value.requestedAt || value.createdAt || value.issuedAt || Date.now());
+  const expiresAt = Number(value.expiresAt || 0);
+  const safeRequestedAt = Number.isFinite(requestedAt) ? requestedAt : Date.now();
+  const safeExpiresAt = Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : safeRequestedAt + OTP_TTL_MS;
+
+  if (Date.now() > safeExpiresAt) {
+    return null;
+  }
+
+  return {
+    email,
+    requestedAt: safeRequestedAt,
+    expiresAt: safeExpiresAt,
+  };
+}
+
+function isSignedIn() {
+  return Boolean(authSession?.token && authSession.email && activeEmail && normalizeEmail(authSession.email) === activeEmail);
+}
+
+function clearAuthSession() {
+  authSession = null;
+  persistJson(AUTH_SESSION_KEY, null);
+}
+
+function clearAuthChallenge() {
+  authChallenge = null;
+  persistJson(AUTH_CHALLENGE_KEY, null);
+}
+
+function buildApiUrl(path) {
+  return new URL(path, PORTAL_API_BASE.endsWith("/") ? PORTAL_API_BASE : `${PORTAL_API_BASE}/`).toString();
+}
+
+function syncAuthControls() {
+  const hasChallenge = Boolean(authChallenge?.email);
+  elements.sendCodeButton.disabled = authBusy;
+  elements.changeEmailButton.disabled = authBusy;
+  elements.emailInput.disabled = hasChallenge || authBusy;
+
+  for (const digitInput of elements.otpDigits) {
+    digitInput.disabled = !hasChallenge || authBusy;
+  }
+}
+
+async function apiRequest(path, options = {}) {
+  const controller = new AbortController();
+  const timeoutMs = Number(options.timeoutMs || 15000);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const headers = new Headers(options.headers || {});
+    const init = {
+      method: options.method || "GET",
+      headers,
+      signal: controller.signal,
+    };
+
+    if (options.body !== undefined) {
+      if (typeof options.body === "string" || options.body instanceof FormData || options.body instanceof URLSearchParams) {
+        init.body = options.body;
+      } else {
+        init.body = JSON.stringify(options.body);
+        if (!headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
+        }
+      }
+    }
+
+    const response = await fetch(buildApiUrl(path), init);
+    const text = await response.text();
+    let payload = {};
+
+    if (text.trim()) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = { message: text };
+      }
+    }
+
+    if (!response.ok) {
+      const error = new Error(payload.message || response.statusText || "Request failed");
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+
+    return payload;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -1386,27 +1539,26 @@ function renderApp() {
 
 function renderAuth(preferredEmail = "") {
   const challengeEmail = normalizeEmail(authChallenge?.email || "");
-  const showChallenge = Boolean(challengeEmail) && Boolean(authChallenge?.code);
+  const showChallenge = Boolean(challengeEmail);
   const stage = showChallenge ? "code" : "email";
 
   elements.authCard.dataset.authStage = stage;
   elements.emailInput.value = challengeEmail || normalizeEmail(authSession?.email || preferredEmail || "");
-  elements.emailInput.disabled = showChallenge;
-  for (const digitInput of elements.otpDigits) {
-    digitInput.disabled = !showChallenge;
-  }
   elements.otpPanel.setAttribute("aria-hidden", String(!showChallenge));
   elements.sendCodeButton.setAttribute("aria-label", showChallenge ? "Verify code" : "Send code");
   elements.authMessage.textContent = showChallenge
-    ? `A code is ready for ${challengeEmail}.`
+    ? `A 6-digit code was sent to ${challengeEmail}.`
     : "We’ll send a code to your email.";
-  elements.demoCodeText.textContent = DEMO_MODE && showChallenge ? `Demo code: ${authChallenge.code}` : "";
-  elements.demoCodeText.classList.toggle("is-hidden", !(showChallenge && DEMO_MODE));
+  elements.demoCodeText.textContent = showChallenge
+    ? `Check ${challengeEmail} for the code. It expires in 10 minutes.`
+    : "";
+  elements.demoCodeText.classList.toggle("is-hidden", !showChallenge);
   clearOtpDigits();
+  syncAuthControls();
 }
 
 function refreshView() {
-  if (authSession?.signedIn && activeEmail) {
+  if (isSignedIn()) {
     const route = resolveRouteFromHash();
     const rawHash = window.location.hash.replace(/^#/, "");
 
@@ -1451,15 +1603,11 @@ function refreshView() {
   }
 
   setView("auth");
-  renderAuth();
+  renderAuth(activeEmail);
 }
 
 function validateEmail(email) {
   return /^\S+@\S+\.\S+$/.test(email);
-}
-
-function generateOtp() {
-  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 function clearOtpDigits() {
@@ -1481,7 +1629,7 @@ function setOtpDigits(value) {
 }
 
 function maybeAutoVerifyOtp() {
-  if (!authChallenge?.code || !authChallenge?.email) {
+  if (authBusy || !authChallenge?.email) {
     return false;
   }
 
@@ -1489,7 +1637,7 @@ function maybeAutoVerifyOtp() {
     return false;
   }
 
-  verifyOtpFlow();
+  void verifyOtpFlow();
   return true;
 }
 
@@ -1523,7 +1671,7 @@ function handleOtpDigitInput(event) {
   const digitInput = event.target;
   const index = elements.otpDigits.indexOf(digitInput);
 
-  if (index < 0) {
+  if (index < 0 || authBusy || !authChallenge?.email) {
     return;
   }
 
@@ -1555,13 +1703,13 @@ function handleOtpDigitKeydown(event) {
   const digitInput = event.target;
   const index = elements.otpDigits.indexOf(digitInput);
 
-  if (index < 0) {
+  if (index < 0 || authBusy || !authChallenge?.email) {
     return;
   }
 
   if (event.key === "Enter") {
     event.preventDefault();
-    verifyOtpFlow();
+    void verifyOtpFlow();
     return;
   }
 
@@ -1586,6 +1734,10 @@ function handleOtpDigitKeydown(event) {
 }
 
 function handleOtpDigitPaste(event) {
+  if (authBusy || !authChallenge?.email) {
+    return;
+  }
+
   const pasted = String(event.clipboardData?.getData("text") || "").replace(/\D/g, "");
 
   if (!pasted) {
@@ -1600,54 +1752,90 @@ function handleOtpDigitPaste(event) {
 }
 
 function handlePrimaryAuthAction() {
-  if (authChallenge?.code && authChallenge?.email) {
-    verifyOtpFlow();
+  if (authBusy) {
     return;
   }
 
-  startOtpFlow();
+  if (authChallenge?.email) {
+    void verifyOtpFlow();
+    return;
+  }
+
+  void startOtpFlow();
 }
 
-function startOtpFlow() {
+async function startOtpFlow() {
   const typedEmail = normalizeEmail(elements.emailInput.value);
-  const email = typedEmail || (DEMO_MODE ? DEMO_AUTH_EMAIL : "");
+  const email = typedEmail;
 
   if (!validateEmail(email)) {
-    authChallenge = null;
-    persistJson(AUTH_CHALLENGE_KEY, null);
+    clearAuthChallenge();
     clearOtpDigits();
     renderAuth(typedEmail);
     elements.authMessage.textContent = "Enter a valid email address first.";
-    elements.demoCodeText.classList.add("is-hidden");
     elements.emailInput.focus();
     return;
   }
 
-  authChallenge = {
-    email,
-    code: generateOtp(),
-    expiresAt: Date.now() + OTP_TTL_MS,
-  };
-  persistJson(AUTH_CHALLENGE_KEY, authChallenge);
-  renderAuth();
-  window.requestAnimationFrame(() => {
-    focusOtpDigit(0);
-  });
+  authBusy = true;
+  syncAuthControls();
+  elements.authMessage.textContent = "Sending your code...";
+
+  try {
+    const response = await apiRequest("/api/auth/otp/request", {
+      method: "POST",
+      body: { email },
+    });
+
+    authChallenge = normalizeStoredChallenge({
+      email: response.email || email,
+      requestedAt: response.requestedAt || Date.now(),
+      expiresAt: response.expiresAt || Date.now() + OTP_TTL_MS,
+    });
+    if (authChallenge) {
+      persistJson(AUTH_CHALLENGE_KEY, authChallenge);
+    }
+
+    clearAuthSession();
+    authBusy = false;
+    renderAuth(email);
+    elements.authMessage.textContent = `A 6-digit code was sent to ${email}.`;
+    elements.demoCodeText.textContent = `Check ${email} for the code. It expires in 10 minutes.`;
+    elements.demoCodeText.classList.remove("is-hidden");
+    window.requestAnimationFrame(() => {
+      focusOtpDigit(0);
+    });
+  } catch (error) {
+    authBusy = false;
+    clearAuthChallenge();
+    renderAuth(email);
+    elements.authMessage.textContent = error?.payload?.message || error?.message || "Could not send the code.";
+    elements.emailInput.focus();
+  }
 }
 
-function completeSignIn(email) {
-  activeEmail = normalizeEmail(email);
+function completeSignIn(session) {
+  const email = normalizeEmail(session?.email || elements.emailInput.value || authChallenge?.email || "");
+  const token = String(session?.sessionToken || "").trim();
+  if (!email || !token) {
+    return;
+  }
+
+  activeEmail = email;
   clientState = loadClientState(activeEmail);
   state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
   authSession = {
     email: activeEmail,
+    token,
     signedIn: true,
     signedInAt: Date.now(),
+    issuedAt: session?.issuedAt || Date.now(),
+    expiresAt: session?.expiresAt || 0,
   };
-  authChallenge = null;
+  clearAuthChallenge();
+  authBusy = false;
 
   persistJson(AUTH_SESSION_KEY, authSession);
-  persistJson(AUTH_CHALLENGE_KEY, null);
 
   state.activeTab = "features";
   state.settingsMode = "account";
@@ -1659,17 +1847,24 @@ function completeSignIn(email) {
   renderApp();
 }
 
-function verifyOtpFlow() {
+async function verifyOtpFlow() {
+  if (authBusy) {
+    return;
+  }
+
   const enteredCode = getOtpDigits();
   const email = normalizeEmail(elements.emailInput.value || authChallenge?.email || "");
 
-  if (!authChallenge?.code || !authChallenge?.email) {
+  if (!authChallenge?.email) {
     elements.authMessage.textContent = "Send a fresh code first.";
     return;
   }
 
-  if (Date.now() > authChallenge.expiresAt) {
+  if (authChallenge.expiresAt && Date.now() > authChallenge.expiresAt) {
+    clearAuthChallenge();
+    renderAuth(email);
     elements.authMessage.textContent = "That code expired. Send a new one.";
+    elements.emailInput.focus();
     return;
   }
 
@@ -1684,18 +1879,58 @@ function verifyOtpFlow() {
     return;
   }
 
-  if (enteredCode !== String(authChallenge.code)) {
-    elements.authMessage.textContent = "That code is not correct.";
+  authBusy = true;
+  syncAuthControls();
+  elements.authMessage.textContent = "Verifying your code...";
+
+  try {
+    const response = await apiRequest("/api/auth/otp/verify", {
+      method: "POST",
+      body: {
+        email,
+        code: enteredCode,
+      },
+    });
+
+    completeSignIn(response);
+  } catch (error) {
+    authBusy = false;
+    syncAuthControls();
+
+    const payload = error?.payload || {};
+    const message = payload.message || error?.message || "That code is not correct.";
+
+    if (payload.error === "expired" || payload.error === "missing_challenge" || payload.error === "too_many_attempts") {
+      clearAuthChallenge();
+      renderAuth(email);
+      elements.authMessage.textContent = message;
+      elements.emailInput.focus();
+      return;
+    }
+
+    elements.authMessage.textContent = message;
+    focusFirstEmptyOtpDigit();
     return;
   }
-
-  completeSignIn(email);
 }
 
-function signOut() {
+async function signOut() {
   persistClientState();
+  const previousEmail = normalizeEmail(authSession?.email || activeEmail || "");
+  const token = String(authSession?.token || "").trim();
+  if (token) {
+    try {
+      await apiRequest("/api/auth/logout", {
+        method: "POST",
+        body: { token },
+      });
+    } catch {
+      // Ignore logout failures; the local session is still cleared.
+    }
+  }
+
   authSession = null;
-  authChallenge = null;
+  clearAuthChallenge();
   activeEmail = "";
   clientState = loadClientState(activeEmail);
   state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
@@ -1704,10 +1939,9 @@ function signOut() {
   persistLastPrimaryTab();
 
   persistJson(AUTH_SESSION_KEY, null);
-  persistJson(AUTH_CHALLENGE_KEY, null);
   clearHash();
   setView("auth");
-  renderAuth();
+  renderAuth(previousEmail);
   elements.emailInput.focus();
 }
 
@@ -1768,20 +2002,61 @@ function handleMenuAction(action) {
   }
 
   if (action === "logout") {
-    signOut();
+    void signOut();
   }
 }
 
+async function bootstrapAuthState() {
+  authSession = normalizeStoredSession(loadJson(AUTH_SESSION_KEY, null));
+  authChallenge = normalizeStoredChallenge(loadJson(AUTH_CHALLENGE_KEY, null));
+
+  if (authSession?.token) {
+    try {
+      const response = await apiRequest("/api/auth/session", {
+        headers: {
+          Authorization: `Bearer ${authSession.token}`,
+        },
+      });
+
+      authSession = normalizeStoredSession({
+        email: response.email || authSession.email,
+        token: response.token || authSession.token,
+        signedInAt: response.issuedAt || authSession.signedInAt || Date.now(),
+        expiresAt: response.expiresAt || authSession.expiresAt || 0,
+      });
+      activeEmail = normalizeEmail(authSession?.email || "");
+      clientState = loadClientState(activeEmail);
+      state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
+      clearAuthChallenge();
+    } catch {
+      const previousEmail = normalizeEmail(authSession?.email || authChallenge?.email || "");
+      clearAuthSession();
+      activeEmail = normalizeEmail(authChallenge?.email || previousEmail);
+      clientState = loadClientState(activeEmail);
+      state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
+    }
+  } else {
+    activeEmail = normalizeEmail(authChallenge?.email || "");
+    clientState = loadClientState(activeEmail);
+    state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
+  }
+
+  refreshView();
+}
+
 function bindEvents() {
-  elements.sendCodeButton.addEventListener("click", handlePrimaryAuthAction);
+  elements.sendCodeButton.addEventListener("click", () => {
+    void handlePrimaryAuthAction();
+  });
   elements.changeEmailButton.addEventListener("click", () => {
-    authChallenge = null;
-    persistJson(AUTH_CHALLENGE_KEY, null);
+    clearAuthChallenge();
     clearOtpDigits();
     renderAuth();
     elements.emailInput.focus();
   });
-  elements.signOutButton.addEventListener("click", signOut);
+  elements.signOutButton.addEventListener("click", () => {
+    void signOut();
+  });
   elements.closeSettingsButton.addEventListener("click", closeSettings);
   elements.backToFeaturesButton.addEventListener("click", closeFeatureStudio);
 
@@ -1832,7 +2107,7 @@ function bindEvents() {
   });
 
   window.addEventListener("hashchange", () => {
-    if (!authSession?.signedIn) {
+    if (!isSignedIn()) {
       return;
     }
 
@@ -1886,7 +2161,7 @@ function bindEvents() {
   elements.emailInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      handlePrimaryAuthAction();
+      void handlePrimaryAuthAction();
     }
   });
 
@@ -1985,4 +2260,4 @@ function bindEvents() {
 }
 
 bindEvents();
-refreshView();
+void bootstrapAuthState();
