@@ -12,6 +12,9 @@ const SETTINGS_PANEL_ANIMATION_MS = 320;
 const VALID_TABS = new Set(["features", "preview", "simulator", "settings"]);
 const TAB_ALIASES = new Map([["guidance", "features"]]);
 const VALID_SETTINGS_MODES = new Set(["account", "preferences"]);
+const LOCAL_APPROVAL_URL = "../approval.html";
+// Keep the local demo sign-in usable even before a tester types an email.
+const DEMO_AUTH_EMAIL = "demo@handyman.com";
 
 const DEFAULT_PROMPT = {
   toneGuidance: "Warm, direct, and practical. Keep replies human, short, and grounded.",
@@ -22,7 +25,7 @@ const DEFAULT_PROMPT = {
   escalationGuidance:
     "Hand off when the customer is upset, the answer needs a human decision, or the request is urgent.",
   approvalGuidance:
-    "When a WhatsApp message arrives, format the bot message with who sent it, the latest message, and one suggested reply. Keep send manual and make Edit open the hosted approval page with the draft prefilled.",
+    "When a WhatsApp message arrives, format the bot message with who sent it, the latest message, and one suggested reply. Keep send manual and make Edit open the approval page with the draft prefilled.",
   exampleReplies:
     "Good: \"Yes, I can help. What is the address?\"\nBad: \"Sure, anything is possible.\"",
   responseStyle: "balanced",
@@ -40,11 +43,11 @@ const DEFAULT_FEATURES = [
     id: "whatsapp-business-reply-suggestion-assistant",
     name: "WhatsApp Reply Approval Bot",
     description:
-      "Drafts suggested replies, posts them to an internal approval bot, and opens a hosted edit page for revised approval.",
+      "Drafts suggested replies, posts them to an internal approval bot, and opens a reusable approval page for revised approval.",
     channel: "WhatsApp",
     mode: "Approval bot",
     status: "Active",
-    approvalUrl: "https://approval.example.com/review",
+    approvalUrl: LOCAL_APPROVAL_URL,
     prompt: { ...DEFAULT_PROMPT },
   },
 ];
@@ -57,7 +60,7 @@ const DEFAULT_SIMULATOR = {
     latestMessage: "Hey, are you available today?",
     threadContext:
       "Customer asked about availability last week.\nOwner said afternoons are easier.",
-    approvalUrl: "https://approval.example.com/review",
+    approvalUrl: LOCAL_APPROVAL_URL,
   },
   approvals: [],
   selectedApprovalId: "",
@@ -759,10 +762,6 @@ function buildSimulatorEditUrl(approval) {
     return null;
   }
 
-  if (approvalUrl.includes("approval.example.com")) {
-    return null;
-  }
-
   try {
     const url = new URL(approvalUrl, window.location.href);
     url.searchParams.set("senderName", approval.senderName || "");
@@ -770,7 +769,10 @@ function buildSimulatorEditUrl(approval) {
     url.searchParams.set("latestMessage", approval.latestMessage || "");
     url.searchParams.set("suggestedReply", approval.suggestedReply || "");
     url.searchParams.set("replyDraft", approval.replyDraft || "");
+    url.searchParams.set("context", (approval.threadContext || []).join("\n"));
     url.searchParams.set("approvalId", approval.approvalId || "");
+    url.searchParams.set("clientName", getWorkspaceName());
+    url.searchParams.set("returnUrl", new URL("./", window.location.href).toString());
     return url.toString();
   } catch {
     return null;
@@ -1113,8 +1115,8 @@ function updateSimulatorDetail() {
   }
   if (elements.simulatorApprovalNote) {
     elements.simulatorApprovalNote.textContent = approval.approvalUrl
-      ? `In production, Edit opens ${approval.approvalUrl}. In the simulator, the draft stays local.`
-      : "In the simulator, Edit keeps the draft local.";
+      ? `Edit opens ${approval.approvalUrl} with the sender, message, and draft prefilled.`
+      : "Edit keeps the draft local in this simulator.";
   }
   if (elements.simulatorSendButton) {
     elements.simulatorSendButton.disabled = approval.status === "sent";
@@ -1370,19 +1372,19 @@ function renderApp() {
   setStatus("Autosaved locally");
 }
 
-function renderAuth() {
+function renderAuth(preferredEmail = "") {
   const challengeEmail = normalizeEmail(authChallenge?.email || "");
   const showChallenge = Boolean(challengeEmail) && Boolean(authChallenge?.code);
   const stage = showChallenge ? "code" : "email";
 
   elements.authCard.dataset.authStage = stage;
-  elements.emailInput.value = challengeEmail || normalizeEmail(authSession?.email || "");
+  elements.emailInput.value = challengeEmail || normalizeEmail(authSession?.email || preferredEmail || "");
   elements.emailInput.disabled = showChallenge;
   for (const digitInput of elements.otpDigits) {
     digitInput.disabled = !showChallenge;
   }
   elements.otpPanel.setAttribute("aria-hidden", String(!showChallenge));
-  elements.sendCodeButton.setAttribute("aria-label", showChallenge ? "Verify code" : "Log in");
+  elements.sendCodeButton.setAttribute("aria-label", showChallenge ? "Verify code" : "Send code");
   elements.authMessage.textContent = showChallenge
     ? `A code is ready for ${challengeEmail}.`
     : "We’ll send a code to your email.";
@@ -1595,13 +1597,14 @@ function handlePrimaryAuthAction() {
 }
 
 function startOtpFlow() {
-  const email = normalizeEmail(elements.emailInput.value);
+  const typedEmail = normalizeEmail(elements.emailInput.value);
+  const email = typedEmail || (DEMO_MODE ? DEMO_AUTH_EMAIL : "");
 
   if (!validateEmail(email)) {
     authChallenge = null;
     persistJson(AUTH_CHALLENGE_KEY, null);
     clearOtpDigits();
-    renderAuth();
+    renderAuth(typedEmail);
     elements.authMessage.textContent = "Enter a valid email address first.";
     elements.demoCodeText.classList.add("is-hidden");
     elements.emailInput.focus();
