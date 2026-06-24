@@ -379,6 +379,14 @@ class PortalAuthHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003 - BaseHTTPRequestHandler API
         return
 
+    def end_headers(self) -> None:
+        if not self.path.startswith("/api/auth/"):
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+
+        super().end_headers()
+
     def do_OPTIONS(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         if self.path.startswith("/api/auth/"):
             self.send_response(HTTPStatus.NO_CONTENT)
