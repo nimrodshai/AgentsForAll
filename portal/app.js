@@ -560,6 +560,10 @@ function splitLines(value) {
     .filter(Boolean);
 }
 
+function normalizeText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -746,6 +750,31 @@ function createSimulatorApproval(composer, options = {}) {
   }
 
   return approval;
+}
+
+function buildSimulatorEditUrl(approval) {
+  const approvalUrl = String(approval?.approvalUrl || "").trim();
+
+  if (!approvalUrl) {
+    return null;
+  }
+
+  if (approvalUrl.includes("approval.example.com")) {
+    return null;
+  }
+
+  try {
+    const url = new URL(approvalUrl, window.location.href);
+    url.searchParams.set("senderName", approval.senderName || "");
+    url.searchParams.set("senderWaId", approval.senderWaId || "");
+    url.searchParams.set("latestMessage", approval.latestMessage || "");
+    url.searchParams.set("suggestedReply", approval.suggestedReply || "");
+    url.searchParams.set("replyDraft", approval.replyDraft || "");
+    url.searchParams.set("approvalId", approval.approvalId || "");
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function normalizeSimulatorState(savedSimulator = {}) {
@@ -1865,6 +1894,70 @@ function bindEvents() {
   elements.displayNameInput.addEventListener("input", syncSettingsField("displayName"));
   elements.workspaceNameInput.addEventListener("input", syncSettingsField("workspaceName"));
   elements.timezoneSelect.addEventListener("change", syncSettingsField("timezone"));
+
+  if (elements.simulatorPresetSelect) {
+    elements.simulatorPresetSelect.addEventListener("change", (event) => {
+      applySimulatorPreset(event.target.value);
+    });
+  }
+
+  if (elements.simulatorLoadSampleButton) {
+    elements.simulatorLoadSampleButton.addEventListener("click", () => {
+      applySimulatorPreset(elements.simulatorPresetSelect?.value || DEFAULT_SIMULATOR.composer.scenario);
+    });
+  }
+
+  if (elements.simulatorQueueButton) {
+    elements.simulatorQueueButton.addEventListener("click", queueSimulatorApproval);
+  }
+
+  if (elements.simulatorReplyInput) {
+    elements.simulatorReplyInput.addEventListener("input", syncSimulatorReplyDraft);
+  }
+
+  if (elements.simulatorEditButton) {
+    elements.simulatorEditButton.addEventListener("click", () => {
+      const approval = getSelectedSimulatorApproval();
+      if (!approval) {
+        return;
+      }
+
+      const editUrl = buildSimulatorEditUrl(approval);
+      if (editUrl) {
+        window.open(editUrl, "_blank", "noopener,noreferrer");
+        updateStatusFromSimulator("Opened approval page");
+        return;
+      }
+
+      if (elements.simulatorReplyInput) {
+        elements.simulatorReplyInput.focus();
+        if (typeof elements.simulatorReplyInput.select === "function") {
+          elements.simulatorReplyInput.select();
+        }
+      }
+
+      updateStatusFromSimulator("Focused the local reply draft");
+    });
+  }
+
+  if (elements.simulatorSendButton) {
+    elements.simulatorSendButton.addEventListener("click", markSimulatorApprovalSent);
+  }
+
+  for (const field of [
+    ["simulatorSenderNameInput", "senderName"],
+    ["simulatorSenderWaIdInput", "senderWaId"],
+    ["simulatorMessageInput", "latestMessage"],
+    ["simulatorContextInput", "threadContext"],
+    ["simulatorApprovalUrlInput", "approvalUrl"],
+  ]) {
+    const [elementKey, stateKey] = field;
+    const element = elements[elementKey];
+
+    if (element) {
+      element.addEventListener("input", syncSimulatorComposerField(stateKey));
+    }
+  }
 
   elements.copyButton.addEventListener("click", async () => {
     try {

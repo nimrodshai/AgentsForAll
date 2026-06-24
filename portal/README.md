@@ -14,6 +14,7 @@ It is intentionally separate from the reusable spec and client config layers.
 
 - `Features` for the client account and its assigned capabilities. Click one to open its studio.
 - `Preview` for testing a reply before it is used
+- `Simulator` for queuing browser-local WhatsApp mock messages, drafting a reply, and simulating send/edit actions without a backend
 - `Settings` opens as a modal overlay for account details and workspace preferences
 - The top-right menu opens account, settings, and log out actions
 
@@ -21,6 +22,7 @@ It is intentionally separate from the reusable spec and client config layers.
 
 - Clients sign in with email and a one-time code.
 - This version uses a local demo OTP so the flow works without a backend.
+- The simulator is browser-local too, so it can be tested before any WhatsApp webhook or approval server exists.
 - Replace the demo OTP with a real email delivery and verification service before production.
 
 ## Local usage
