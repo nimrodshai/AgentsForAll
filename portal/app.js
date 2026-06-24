@@ -10,6 +10,7 @@ const VALID_TABS = new Set(["features", "preview", "simulator", "settings"]);
 const TAB_ALIASES = new Map([["guidance", "features"]]);
 const VALID_SETTINGS_MODES = new Set(["account", "preferences"]);
 const LOCAL_APPROVAL_URL = "../approval.html";
+const LOCAL_PORTAL_API_BASE = "http://127.0.0.1:8000";
 
 const DEFAULT_PROMPT = {
   toneGuidance: "Warm, direct, and practical. Keep replies human, short, and grounded.",
@@ -308,8 +309,16 @@ function resolvePortalApiBase() {
     return fromMeta.replace(/\/+$/, "");
   }
 
-  if (window.location.protocol === "file:" || window.location.origin === "null") {
-    return "http://127.0.0.1:8000";
+  const fromQuery = new URLSearchParams(window.location.search).get("apiBase")?.trim();
+  if (fromQuery) {
+    return fromQuery.replace(/\/+$/, "");
+  }
+
+  const hostname = String(window.location.hostname || "").toLowerCase();
+  const isGithubPagesHost = hostname === "github.io" || hostname.endsWith(".github.io");
+
+  if (window.location.protocol === "file:" || window.location.origin === "null" || isGithubPagesHost) {
+    return LOCAL_PORTAL_API_BASE;
   }
 
   return window.location.origin.replace(/\/+$/, "");

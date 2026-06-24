@@ -39,3 +39,7 @@ python3 scripts/run_portal_server.py --port 8000
 ```
 
 Then visit `http://localhost:8000/portal/`.
+
+If you open the static portal from GitHub Pages, the UI falls back to `http://127.0.0.1:8000`
+unless you provide a different API base with `window.PORTAL_API_BASE`, the
+`portal-api-base` meta tag, or `?apiBase=...` in the URL.
