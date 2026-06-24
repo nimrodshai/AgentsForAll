@@ -128,6 +128,7 @@
         <nav class="tab-strip" aria-label="Workspace tabs">
           <button class="tab-button is-active" data-tab="features" type="button">Features</button>
           <button class="tab-button" data-tab="preview" type="button">Preview</button>
+          <button class="tab-button" data-tab="simulator" type="button">Simulator</button>
         </nav>
 
         <div class="topbar-actions">
@@ -370,6 +371,158 @@ Bad: 'Sure, anything is possible.'"
         </div>
       </section>
 
+      <section id="simulatorPanel" class="tab-panel is-hidden">
+        <div class="panel-intro">
+          <div>
+            <p class="eyebrow">Simulator</p>
+            <h1>Queue mock WhatsApp messages locally.</h1>
+            <p class="lede compact">
+              Build a pending approval without a server. The inbox, reply draft, and send
+              action all stay inside your browser.
+            </p>
+          </div>
+          <div class="panel-spotlight">
+            <span class="status-pill">
+              <span class="status-dot"></span>
+              Browser-local only
+            </span>
+          </div>
+        </div>
+
+        <div class="card-grid simulator-grid">
+          <article class="glass-card preview-card simulator-compose-card">
+            <div class="card-head">
+              <h3>Create a mock inbound message</h3>
+              <span class="feature-status">Local demo</span>
+            </div>
+
+            <label class="field compact">
+              <span>Example scenario</span>
+              <select id="simulatorPresetSelect">
+                <option value="approval">WhatsApp approval bot example</option>
+                <option value="availability">New lead asking about availability</option>
+                <option value="pricing">Customer asking about price</option>
+                <option value="reschedule">Existing client wants to reschedule</option>
+                <option value="urgent">Urgent request that should escalate</option>
+              </select>
+            </label>
+
+            <div class="simulator-form-grid">
+              <label class="field">
+                <span>Sender name</span>
+                <input id="simulatorSenderNameInput" type="text" placeholder="Jim Hopper" />
+              </label>
+
+              <label class="field">
+                <span>WhatsApp ID</span>
+                <input id="simulatorSenderWaIdInput" type="text" placeholder="15551230000" />
+              </label>
+
+              <label class="field">
+                <span>Latest message</span>
+                <textarea
+                  id="simulatorMessageInput"
+                  rows="4"
+                  placeholder="Hey, are you available today?"
+                ></textarea>
+              </label>
+
+              <label class="field">
+                <span>Conversation context</span>
+                <textarea
+                  id="simulatorContextInput"
+                  rows="5"
+                  placeholder="Customer asked about availability last week.
+Owner said afternoons are easier."
+                ></textarea>
+              </label>
+
+              <label class="field compact">
+                <span>Edit URL</span>
+                <input
+                  id="simulatorApprovalUrlInput"
+                  type="url"
+                  placeholder="https://approval.example.com/review"
+                />
+              </label>
+            </div>
+
+            <div class="preview-actions">
+              <button id="simulatorQueueButton" class="primary-button" type="button">
+                Queue approval
+              </button>
+              <button id="simulatorLoadSampleButton" class="ghost-button" type="button">
+                Load sample
+              </button>
+            </div>
+
+            <p class="approval-note">
+              Nothing is sent to WhatsApp. This creates a mock approval record in your browser.
+            </p>
+          </article>
+
+          <article class="glass-card preview-card simulator-inbox-card">
+            <div class="card-head">
+              <h3>Approval inbox</h3>
+              <span id="simulatorQueueCount" class="feature-status">0 pending</span>
+            </div>
+
+            <div id="simulatorQueueList" class="simulator-queue"></div>
+          </article>
+
+          <article class="glass-card preview-card simulator-detail-card">
+            <div class="card-head">
+              <h3 id="simulatorDetailTitle">Select a queued approval</h3>
+              <span id="simulatorDetailStatus" class="feature-status">Empty</span>
+            </div>
+
+            <div class="phone-shell simulator-shell">
+              <div class="phone-status">
+                <span id="simulatorDetailSender" class="phone-name">No sender</span>
+                <span class="phone-badge">Local approval</span>
+              </div>
+
+              <div class="approval-thread">
+                <div class="approval-field">
+                  <span class="approval-label">Latest message</span>
+                  <div id="simulatorDetailMessage" class="bubble incoming">
+                    Queue a message to see it here.
+                  </div>
+                </div>
+
+                <div class="approval-field">
+                  <span class="approval-label">Suggested reply</span>
+                  <textarea
+                    id="simulatorReplyInput"
+                    class="simulator-reply"
+                    rows="4"
+                    placeholder="Suggested reply will appear here."
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="approval-actions">
+                <button id="simulatorEditButton" class="ghost-button small" type="button">
+                  Edit
+                </button>
+                <button id="simulatorSendButton" class="primary-button small" type="button">
+                  Send
+                </button>
+              </div>
+
+              <p id="simulatorApprovalNote" class="approval-note">
+                Edit keeps the reply local in this simulator.
+              </p>
+            </div>
+
+            <div class="simulator-context-block">
+              <span class="approval-label">Conversation context</span>
+              <div id="simulatorContextList" class="simulator-context-list"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section
         id="settingsPanel"
         class="settings-overlay is-hidden"
@@ -457,6 +610,6 @@ Bad: 'Sure, anything is possible.'"
       </section>
     </section>
 
-    <script src="./app.js?v=20"></script>
+    <script src="./app.js?v=21"></script>
   </body>
 </html>
