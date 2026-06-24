@@ -5,7 +5,7 @@ services:
     plan: free
     autoDeploy: true
     buildCommand: python3 -m pip install -r requirements.txt
-    startCommand: python3 scripts/run_portal_server.py --host 0.0.0.0 --port $PORT
+    startCommand: python3 -u scripts/run_portal_server.py --host 0.0.0.0 --port $PORT
     healthCheckPath: /portal/
     envVars:
       - key: PORTAL_MAIL_PROVIDER

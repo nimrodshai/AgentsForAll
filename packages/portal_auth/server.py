@@ -728,31 +728,35 @@ def main() -> int:
     server = create_server(args.host, args.port, repo_root, config)
     provider = normalize_mail_provider(config.mail_provider)
 
-    print(f"Portal server listening on http://{args.host}:{args.port}/portal/")
+    print(f"Portal server listening on http://{args.host}:{args.port}/portal/", flush=True)
     if provider == "resend":
         if config.resend.configured:
-            print("Using Resend for OTP delivery.")
+            print("Using Resend for OTP delivery.", flush=True)
         else:
-            print("Resend is not configured yet. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL.")
+            print(
+                "Resend is not configured yet. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL.",
+                flush=True,
+            )
     elif provider == "auto":
         if config.resend.configured:
-            print("Using Resend for OTP delivery.")
+            print("Using Resend for OTP delivery.", flush=True)
         elif config.smtp.configured:
-            print("Using SMTP for OTP delivery.")
+            print("Using SMTP for OTP delivery.", flush=True)
         else:
             print(
                 "No mail provider is configured yet. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL, "
-                "or PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL."
+                "or PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL.",
+                flush=True,
             )
     elif config.smtp.configured:
-        print("Using SMTP for OTP delivery.")
+        print("Using SMTP for OTP delivery.", flush=True)
     else:
-        print("SMTP is not configured yet. Set PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL.")
+        print("SMTP is not configured yet. Set PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL.", flush=True)
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down portal server.")
+        print("\nShutting down portal server.", flush=True)
     finally:
         server.server_close()
 
