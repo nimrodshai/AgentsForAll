@@ -23,8 +23,30 @@ It is intentionally separate from the reusable spec and client config layers.
 
 - Clients sign in with email and a one-time code.
 - The code is now issued by `scripts/run_portal_server.py` and verified by the server instead of being mocked in the browser.
-- Set `PORTAL_SMTP_HOST` and `PORTAL_SMTP_FROM_EMAIL` so the server can actually email the code.
+- Set either the SMTP variables or the Resend variables so the server can actually email the code.
 - The simulator is still browser-local, so it can be tested before any WhatsApp webhook or approval server exists.
+
+## Recommended test hosting
+
+For a free, non-24/7 test server, deploy the repo to Render as a free web service and use Resend for OTP delivery.
+
+Why this setup works:
+
+- Render free web services can host the Python portal backend and static portal together.
+- Render free services block outbound SMTP ports, so an HTTPS email API is the safer choice.
+- Resend has a free tier and sends over HTTPS, which fits the free Render plan.
+
+When you are ready for always-on hosting, you can upgrade the Render service to a paid plan and keep the same code.
+
+Required environment variables on Render:
+
+- `PORTAL_MAIL_PROVIDER=resend`
+- `PORTAL_RESEND_API_KEY`
+- `PORTAL_RESEND_FROM_EMAIL`
+- `PORTAL_RESEND_FROM_NAME`
+- `PORTAL_PRODUCT_NAME` if you want a label other than `Workspace`
+
+The `PORTAL_RESEND_API_KEY` and `PORTAL_RESEND_FROM_EMAIL` values should be added as secrets in the Render dashboard.
 
 ## Local usage
 

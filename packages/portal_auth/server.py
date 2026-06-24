@@ -2,7 +2,7 @@
 """Portal server with real email OTP authentication.
 
 This server serves the portal static files from the repository root and exposes
-JSON endpoints for requesting and verifying one-time passcodes via SMTP.
+JSON endpoints for requesting and verifying one-time passcodes via SMTP or Resend.
 """
 
 from __future__ import annotations
@@ -25,14 +25,18 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 
 EMAIL_RE = re.compile(r"^\S+@\S+\.\S+$")
 DEFAULT_PRODUCT_NAME = "Workspace"
+DEFAULT_MAIL_PROVIDER = "smtp"
 DEFAULT_OTP_TTL_SECONDS = 10 * 60
 DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_MAX_ATTEMPTS = 5
 DEFAULT_SMTP_PORT = 587
+RESEND_API_URL = "https://api.resend.com/emails"
 JSON_CONTENT_TYPE = "application/json; charset=utf-8"
 
 
@@ -54,12 +58,25 @@ class SmtpConfig:
 
 
 @dataclass(slots=True)
+class ResendConfig:
+    api_key: str = ""
+    from_email: str = ""
+    from_name: str = DEFAULT_PRODUCT_NAME
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.api_key and self.from_email)
+
+
+@dataclass(slots=True)
 class PortalConfig:
     product_name: str = DEFAULT_PRODUCT_NAME
+    mail_provider: str = DEFAULT_MAIL_PROVIDER
     otp_ttl_seconds: int = DEFAULT_OTP_TTL_SECONDS
     session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
     smtp: SmtpConfig = field(default_factory=SmtpConfig)
+    resend: ResendConfig = field(default_factory=ResendConfig)
 
 
 @dataclass(slots=True)
@@ -252,6 +269,7 @@ def read_int_env(name: str, default: int) -> int:
 
 
 def load_config() -> PortalConfig:
+    provider = normalize_mail_provider(os.getenv("PORTAL_MAIL_PROVIDER", DEFAULT_MAIL_PROVIDER))
     smtp = SmtpConfig(
         host=os.getenv("PORTAL_SMTP_HOST", "").strip(),
         port=read_int_env("PORTAL_SMTP_PORT", DEFAULT_SMTP_PORT),
@@ -263,13 +281,42 @@ def load_config() -> PortalConfig:
         starttls=read_bool_env("PORTAL_SMTP_STARTTLS", True),
         timeout=float(read_int_env("PORTAL_SMTP_TIMEOUT", 10)),
     )
+    resend = ResendConfig(
+        api_key=os.getenv("PORTAL_RESEND_API_KEY", "").strip(),
+        from_email=os.getenv("PORTAL_RESEND_FROM_EMAIL", "").strip(),
+        from_name=os.getenv("PORTAL_RESEND_FROM_NAME", DEFAULT_PRODUCT_NAME).strip() or DEFAULT_PRODUCT_NAME,
+    )
 
     return PortalConfig(
         product_name=os.getenv("PORTAL_PRODUCT_NAME", DEFAULT_PRODUCT_NAME).strip() or DEFAULT_PRODUCT_NAME,
+        mail_provider=provider,
         otp_ttl_seconds=read_int_env("PORTAL_OTP_TTL_SECONDS", DEFAULT_OTP_TTL_SECONDS),
         session_ttl_seconds=read_int_env("PORTAL_SESSION_TTL_SECONDS", DEFAULT_SESSION_TTL_SECONDS),
         max_attempts=read_int_env("PORTAL_OTP_MAX_ATTEMPTS", DEFAULT_MAX_ATTEMPTS),
         smtp=smtp,
+        resend=resend,
+    )
+
+
+def normalize_mail_provider(value: str) -> str:
+    provider = str(value or "").strip().lower()
+    if provider in {"smtp", "resend", "auto"}:
+        return provider
+
+    return DEFAULT_MAIL_PROVIDER
+
+
+def build_otp_email_text(config: PortalConfig, code: str) -> str:
+    return "\n".join(
+        [
+            f"Your {config.product_name} sign-in code is {code}.",
+            "",
+            f"It expires in {max(1, config.otp_ttl_seconds // 60)} minutes.",
+            "",
+            "If you did not request this code, you can ignore this email.",
+            "",
+            f"Sent at {now_iso()}",
+        ]
     )
 
 
@@ -278,23 +325,11 @@ def build_otp_email(config: PortalConfig, email: str, code: str) -> EmailMessage
     message["Subject"] = f"{config.product_name} sign-in code"
     message["From"] = formataddr((config.smtp.from_name, config.smtp.from_email))
     message["To"] = email
-    message.set_content(
-        "\n".join(
-            [
-                f"Your {config.product_name} sign-in code is {code}.",
-                "",
-                f"It expires in {max(1, config.otp_ttl_seconds // 60)} minutes.",
-                "",
-                "If you did not request this code, you can ignore this email.",
-                "",
-                f"Sent at {now_iso()}",
-            ]
-        )
-    )
+    message.set_content(build_otp_email_text(config, code))
     return message
 
 
-def send_otp_email(config: PortalConfig, email: str, code: str) -> None:
+def send_otp_email_via_smtp(config: PortalConfig, email: str, code: str) -> None:
     if not config.smtp.configured:
         raise RuntimeError("SMTP is not configured. Set PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL.")
 
@@ -328,6 +363,100 @@ def send_otp_email(config: PortalConfig, email: str, code: str) -> None:
                     smtp.close()
                 except Exception:
                     pass
+
+
+def describe_resend_error(raw_body: str, status_code: int) -> str:
+    message = ""
+    raw = str(raw_body or "").strip()
+    if raw:
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            payload = {}
+
+        if isinstance(payload, dict):
+            for key in ("message", "error", "name"):
+                value = payload.get(key)
+                if value:
+                    message = str(value).strip()
+                    break
+
+            errors = payload.get("errors")
+            if not message and isinstance(errors, list) and errors:
+                first_error = errors[0]
+                if isinstance(first_error, dict):
+                    for key in ("message", "field", "code"):
+                        value = first_error.get(key)
+                        if value:
+                            message = str(value).strip()
+                            break
+                elif isinstance(first_error, str):
+                    message = first_error.strip()
+
+        if not message:
+            message = raw
+
+    if not message:
+        message = f"Resend returned HTTP {status_code}."
+
+    return message
+
+
+def send_otp_email_via_resend(config: PortalConfig, email: str, code: str) -> None:
+    if not config.resend.configured:
+        raise RuntimeError("Resend is not configured. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL.")
+
+    payload = {
+        "from": formataddr((config.resend.from_name, config.resend.from_email)),
+        "to": [email],
+        "subject": f"{config.product_name} sign-in code",
+        "text": build_otp_email_text(config, code),
+    }
+    body = json.dumps(payload).encode("utf-8")
+    request = urllib_request.Request(
+        RESEND_API_URL,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {config.resend.api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": f"{config.product_name}/1.0",
+        },
+    )
+
+    try:
+        with urllib_request.urlopen(request, timeout=config.smtp.timeout) as response:
+            response.read()
+            return
+    except urllib_error.HTTPError as exc:
+        raw_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Could not send the code via Resend: {describe_resend_error(raw_body, exc.code)}") from exc
+    except urllib_error.URLError as exc:
+        reason = getattr(exc, "reason", exc)
+        raise RuntimeError(f"Could not send the code via Resend: {reason}") from exc
+
+
+def send_otp_email(config: PortalConfig, email: str, code: str) -> None:
+    provider = normalize_mail_provider(config.mail_provider)
+
+    if provider == "resend":
+        send_otp_email_via_resend(config, email, code)
+        return
+
+    if provider == "auto":
+        if config.resend.configured:
+            send_otp_email_via_resend(config, email, code)
+            return
+        if config.smtp.configured:
+            send_otp_email_via_smtp(config, email, code)
+            return
+
+        raise RuntimeError(
+            "No mail provider is configured. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL, "
+            "or PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL."
+        )
+
+    send_otp_email_via_smtp(config, email, code)
 
 
 def parse_json_body(handler: SimpleHTTPRequestHandler) -> dict[str, Any]:
@@ -597,10 +726,28 @@ def main() -> int:
 
     config = load_config()
     server = create_server(args.host, args.port, repo_root, config)
+    provider = normalize_mail_provider(config.mail_provider)
 
     print(f"Portal server listening on http://{args.host}:{args.port}/portal/")
-    if not config.smtp.configured:
-        print("SMTP is not configured yet. OTP requests will return a clear error until it is set up.")
+    if provider == "resend":
+        if config.resend.configured:
+            print("Using Resend for OTP delivery.")
+        else:
+            print("Resend is not configured yet. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL.")
+    elif provider == "auto":
+        if config.resend.configured:
+            print("Using Resend for OTP delivery.")
+        elif config.smtp.configured:
+            print("Using SMTP for OTP delivery.")
+        else:
+            print(
+                "No mail provider is configured yet. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL, "
+                "or PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL."
+            )
+    elif config.smtp.configured:
+        print("Using SMTP for OTP delivery.")
+    else:
+        print("SMTP is not configured yet. Set PORTAL_SMTP_HOST and PORTAL_SMTP_FROM_EMAIL.")
 
     try:
         server.serve_forever()
