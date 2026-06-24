@@ -203,7 +203,7 @@ function parseHistory(rawValue, senderName) {
 
 function buildState() {
   const approvalId = getParam("approvalId", `local-${Math.random().toString(16).slice(2, 8)}`);
-  const clientName = getParam("clientName", "Lalo");
+  const clientName = getParam("clientName", "Approval chat");
   const senderName = getParam("senderName", "Jim Hopper");
   const senderWaId = getParam("senderWaId", "15551230000");
   const latestMessage = getParam("latestMessage", "Hey, are you available today?");

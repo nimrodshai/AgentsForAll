@@ -17,6 +17,7 @@ It is intentionally separate from the reusable spec and client config layers.
 - `Simulator` for queuing browser-local WhatsApp mock messages, drafting a reply, and simulating send/edit actions without a backend
 - `Settings` opens as a modal overlay for account details and workspace preferences
 - The top-right menu opens account, settings, and log out actions
+- The simulator's Edit button opens [`/approval.html`](/Users/nimrodshai/Documents/Projects/AgentsForAll/approval.html), a reusable local approval page that accepts prefilled sender, message, and draft values.
 
 ## Sign-in flow
 
