@@ -59,7 +59,7 @@ const DEFAULT_SIMULATOR = {
     senderWaId: "15551230000",
     latestMessage: "Hey, are you available today?",
     threadContext:
-      "Customer asked about availability last week.\nOwner said afternoons are easier.",
+      "Can you fit me in later today?\nI can check my calendar now.\nIf not, tomorrow afternoon works too.",
     approvalUrl: LOCAL_APPROVAL_URL,
   },
   approvals: [],
@@ -110,7 +110,7 @@ const SIMULATOR_PRESETS = {
     senderWaId: "15551230000",
     latestMessage: SCENARIOS.approval.user,
     threadContext:
-      "Customer asked about availability last week.\nOwner said afternoons are easier.",
+      "Can you fit me in later today?\nI can check my calendar now.\nIf not, tomorrow afternoon works too.",
     approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
   },
   availability: {
@@ -118,7 +118,7 @@ const SIMULATOR_PRESETS = {
     senderWaId: "15551230001",
     latestMessage: SCENARIOS.availability.user,
     threadContext:
-      "Lead came in from the website yesterday.\nCustomer wants a window for tomorrow afternoon.",
+      "Hi, are you available tomorrow afternoon?\nLet me check the schedule.\nGreat, thanks.",
     approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
   },
   pricing: {
@@ -126,7 +126,7 @@ const SIMULATOR_PRESETS = {
     senderWaId: "15551230002",
     latestMessage: SCENARIOS.pricing.user,
     threadContext:
-      "Customer shared a photo of the lock.\nNeeds a proper quote after the door type is confirmed.",
+      "How much would it cost to replace the lock?\nI can quote it once I know the lock type.\nGot it, I’ll send a photo.",
     approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
   },
   reschedule: {
@@ -134,7 +134,7 @@ const SIMULATOR_PRESETS = {
     senderWaId: "15551230003",
     latestMessage: SCENARIOS.reschedule.user,
     threadContext:
-      "Appointment was booked for Wednesday morning.\nCustomer needs a new time window.",
+      "Can we move the appointment by one day?\nYes, I can check what’s open.\nPerfect.",
     approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
   },
   urgent: {
@@ -142,7 +142,7 @@ const SIMULATOR_PRESETS = {
     senderWaId: "15551230004",
     latestMessage: SCENARIOS.urgent.user,
     threadContext:
-      "The door has been stuck since early morning.\nThis should escalate to a person immediately.",
+      "The door is stuck and I need help right now.\nI’m escalating this to a person immediately.\nThanks, please hurry.",
     approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
   },
 };
@@ -323,7 +323,7 @@ function loadClientState(email) {
   });
   const settings = { ...DEFAULT_SETTINGS, ...(saved.settings || {}) };
   const workspaceName = String(settings.workspaceName || "").trim().toLowerCase();
-  const simulator = normalizeSimulatorState(savedSimulator);
+  const simulator = normalizeSimulatorState(savedSimulator, savedPrompt);
 
   if (!settings.workspaceName || workspaceName === "guidance studio") {
     settings.workspaceName = DEFAULT_SETTINGS.workspaceName;
@@ -655,6 +655,14 @@ function normalizeSimulatorContext(value) {
   return items.map((item) => String(item).trim()).filter(Boolean);
 }
 
+function buildApprovalMessagePayload(threadContext = []) {
+  const messages = normalizeSimulatorContext(threadContext);
+  return messages.map((text, index) => ({
+    direction: index % 2 === 0 ? "incoming" : "outgoing",
+    text,
+  }));
+}
+
 function normalizeSimulatorApproval(record = {}, index = 0) {
   const approvalId = String(record.approvalId || record.id || `local-approval-${index + 1}`);
   const threadContext = normalizeSimulatorContext(record.threadContext || record.context || []);
@@ -726,7 +734,8 @@ function createSimulatorApproval(composer, options = {}) {
   const now = nowIso();
   const approvalId = String(options.approvalId || `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`);
   const threadContext = normalizeSimulatorContext(composer.threadContext);
-  const suggestedReply = buildLocalSuggestion(composer.latestMessage, getSelectedPrompt(), threadContext);
+  const prompt = options.prompt || DEFAULT_PROMPT;
+  const suggestedReply = buildLocalSuggestion(composer.latestMessage, prompt, threadContext);
   const approval = normalizeSimulatorApproval(
     {
       approvalId,
@@ -769,6 +778,7 @@ function buildSimulatorEditUrl(approval) {
     url.searchParams.set("latestMessage", approval.latestMessage || "");
     url.searchParams.set("suggestedReply", approval.suggestedReply || "");
     url.searchParams.set("replyDraft", approval.replyDraft || "");
+    url.searchParams.set("messages", JSON.stringify(buildApprovalMessagePayload(approval.threadContext || [])));
     url.searchParams.set("context", (approval.threadContext || []).join("\n"));
     url.searchParams.set("approvalId", approval.approvalId || "");
     url.searchParams.set("clientName", getWorkspaceName());
@@ -779,7 +789,8 @@ function buildSimulatorEditUrl(approval) {
   }
 }
 
-function normalizeSimulatorState(savedSimulator = {}) {
+function normalizeSimulatorState(savedSimulator = {}, promptSource = DEFAULT_PROMPT) {
+  const prompt = normalizePrompt(promptSource);
   const savedComposer = savedSimulator.composer || {};
   const exampleKey = SIMULATOR_PRESETS[savedComposer.scenario] ? savedComposer.scenario : DEFAULT_SIMULATOR.composer.scenario;
   const preset = SIMULATOR_PRESETS[exampleKey] || SIMULATOR_PRESETS.approval;
@@ -795,7 +806,7 @@ function normalizeSimulatorState(savedSimulator = {}) {
   const approvalsSource = Array.isArray(savedSimulator.approvals) ? savedSimulator.approvals : [];
   const approvals = approvalsSource.length
     ? approvalsSource.map((approval, index) => normalizeSimulatorApproval(approval, index)).filter(Boolean)
-    : [createSimulatorApproval(composer, { approvalId: "sample-local-approval" })];
+    : [createSimulatorApproval(composer, { approvalId: "sample-local-approval", prompt })];
 
   let selectedApprovalId = String(savedSimulator.selectedApprovalId || approvals[0]?.approvalId || "");
   if (!approvals.some((approval) => approval.approvalId === selectedApprovalId)) {
@@ -811,7 +822,7 @@ function normalizeSimulatorState(savedSimulator = {}) {
 
 function getSimulatorState() {
   if (!clientState.simulator) {
-    clientState.simulator = normalizeSimulatorState();
+    clientState.simulator = normalizeSimulatorState({}, getSelectedPrompt());
   }
 
   return clientState.simulator;
@@ -887,7 +898,7 @@ function applySimulatorPreset(presetKey) {
 function queueSimulatorApproval() {
   const simulator = getSimulatorState();
   const composer = simulator.composer || { ...DEFAULT_SIMULATOR.composer };
-  const approval = createSimulatorApproval(composer);
+  const approval = createSimulatorApproval(composer, { prompt: getSelectedPrompt() });
   simulator.approvals = [approval, ...(simulator.approvals || [])];
   simulator.selectedApprovalId = approval.approvalId;
   state.selectedSimulatorId = approval.approvalId;
