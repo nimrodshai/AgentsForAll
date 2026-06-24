@@ -385,6 +385,13 @@ function buildApiUrl(path) {
   return new URL(path, PORTAL_API_BASE.endsWith("/") ? PORTAL_API_BASE : `${PORTAL_API_BASE}/`).toString();
 }
 
+function describeHttpError(response) {
+  const statusText = sanitizeErrorText(response?.statusText || "").replace(/\.$/, "");
+  return statusText
+    ? `The server returned ${response.status} ${statusText}. Please try again.`
+    : `The server returned ${response.status}. Please try again.`;
+}
+
 function syncAuthControls() {
   const hasChallenge = Boolean(authChallenge?.email);
   elements.sendCodeButton.disabled = authBusy;
@@ -578,15 +585,11 @@ async function apiRequest(path, options = {}) {
     }
 
     if (!response.ok) {
-      const error = new Error(formatApiErrorMessage({
-        status: response.status,
-        statusText: response.statusText,
-        payload,
-        message: text,
-      }));
+      const error = new Error(describeHttpError(response));
       error.status = response.status;
       error.statusText = response.statusText;
       error.payload = payload;
+      error.responseText = text;
       throw error;
     }
 
@@ -2036,13 +2039,16 @@ async function verifyOtpFlow() {
   }
 
   if (enteredCode.length !== elements.otpDigits.length) {
-    elements.authMessage.textContent = "Enter the full 6-digit code.";
-    focusFirstEmptyOtpDigit();
+    openAuthAlert("Incomplete code", "Enter the full 6-digit code.", {
+      returnFocus: "otp",
+    });
     return;
   }
 
   if (email !== normalizeEmail(authChallenge.email)) {
-    elements.authMessage.textContent = "Use the same email that requested the code.";
+    openAuthAlert("Wrong email", "Use the same email address that requested the code.", {
+      returnFocus: "email",
+    });
     return;
   }
 
