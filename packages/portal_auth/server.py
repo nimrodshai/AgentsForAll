@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from email.message import EmailMessage
 from email.utils import formataddr
+from email.utils import parseaddr
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -54,7 +55,7 @@ class SmtpConfig:
 
     @property
     def configured(self) -> bool:
-        return bool(self.host and self.from_email)
+        return bool(self.host and extract_email_address(self.from_email))
 
 
 @dataclass(slots=True)
@@ -65,7 +66,7 @@ class ResendConfig:
 
     @property
     def configured(self) -> bool:
-        return bool(self.api_key and self.from_email)
+        return bool(self.api_key and extract_email_address(self.from_email))
 
 
 @dataclass(slots=True)
@@ -249,6 +250,35 @@ def is_valid_email(email: str) -> bool:
     return bool(EMAIL_RE.match(normalize_email(email)))
 
 
+def extract_email_address(value: str) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return ""
+
+    _, parsed_address = parseaddr(raw_value)
+    parsed_address = parsed_address.strip()
+    if parsed_address and is_valid_email(parsed_address):
+        return parsed_address
+
+    if is_valid_email(raw_value):
+        return normalize_email(raw_value)
+
+    return ""
+
+
+def build_sender_header(display_name: str, raw_value: str) -> str:
+    address = extract_email_address(raw_value)
+    if not address:
+        return ""
+
+    parsed_name, _ = parseaddr(str(raw_value or "").strip())
+    name = parsed_name.strip() or str(display_name or "").strip()
+    if name:
+        return formataddr((name, address))
+
+    return address
+
+
 def read_bool_env(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -323,7 +353,11 @@ def build_otp_email_text(config: PortalConfig, code: str) -> str:
 def build_otp_email(config: PortalConfig, email: str, code: str) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = f"{config.product_name} sign-in code"
-    message["From"] = formataddr((config.smtp.from_name, config.smtp.from_email))
+    from_header = build_sender_header(config.smtp.from_name, config.smtp.from_email)
+    if not from_header:
+        raise RuntimeError("SMTP sender address is invalid. Set PORTAL_SMTP_FROM_EMAIL to a valid email address.")
+
+    message["From"] = from_header
     message["To"] = email
     message.set_content(build_otp_email_text(config, code))
     return message
@@ -404,10 +438,20 @@ def describe_resend_error(raw_body: str, status_code: int) -> str:
 
 def send_otp_email_via_resend(config: PortalConfig, email: str, code: str) -> None:
     if not config.resend.configured:
-        raise RuntimeError("Resend is not configured. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL.")
+        raise RuntimeError(
+            "Resend is not configured. Set PORTAL_RESEND_API_KEY and PORTAL_RESEND_FROM_EMAIL "
+            "to a valid sender email."
+        )
+
+    from_header = build_sender_header(config.resend.from_name, config.resend.from_email)
+    if not from_header:
+        raise RuntimeError(
+            "PORTAL_RESEND_FROM_EMAIL must be a valid email address or a formatted sender like "
+            "'Name <email@example.com>'."
+        )
 
     payload = {
-        "from": formataddr((config.resend.from_name, config.resend.from_email)),
+        "from": from_header,
         "to": [email],
         "subject": f"{config.product_name} sign-in code",
         "text": build_otp_email_text(config, code),
