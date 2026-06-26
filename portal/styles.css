@@ -1750,6 +1750,8 @@ a {
   width: min(100%, 76rem);
   padding-top: 0.35rem;
   justify-self: center;
+  justify-items: center;
+  text-align: center;
 }
 
 .feature-page-intro h1 {
@@ -1772,6 +1774,7 @@ a {
 
 .feature-page-meta {
   margin-top: 0.15rem;
+  justify-content: center;
 }
 
 .feature-page-header .feature-status {
