@@ -859,7 +859,7 @@ a {
 
 .brand-logo {
   display: block;
-  height: clamp(1.9rem, 3vw, 2.3rem);
+  height: clamp(4.75rem, 7.5vw, 5.75rem);
   width: auto;
 }
 
