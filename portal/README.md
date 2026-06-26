@@ -45,8 +45,10 @@ Required environment variables on Render:
 - `PORTAL_RESEND_FROM_EMAIL` for a verified sender like `sign-in@yourdomain.com` or `Assistyca <sign-in@yourdomain.com>`
 - `PORTAL_RESEND_FROM_NAME` for the sender label shown in the inbox
 - `PORTAL_PRODUCT_NAME` for the sign-in email subject and product branding inside the email
+- `PORTAL_SESSION_SECRET` optional but recommended when you want session signing to stay independent from mail-provider credentials
 
 The `PORTAL_RESEND_API_KEY` and `PORTAL_RESEND_FROM_EMAIL` values should be added as secrets in the Render dashboard.
+Portal sessions now default to 180 days and survive server restarts when the signing secret stays stable.
 
 ## Local usage
 

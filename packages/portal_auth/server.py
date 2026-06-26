@@ -8,6 +8,7 @@ JSON endpoints for requesting and verifying one-time passcodes via SMTP or Resen
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -16,6 +17,8 @@ import smtplib
 import ssl
 import threading
 import time
+import hmac
+import hashlib
 from dataclasses import dataclass
 from dataclasses import field
 from email.message import EmailMessage
@@ -35,11 +38,12 @@ EMAIL_RE = re.compile(r"^\S+@\S+\.\S+$")
 DEFAULT_PRODUCT_NAME = "Assistyca"
 DEFAULT_MAIL_PROVIDER = "smtp"
 DEFAULT_OTP_TTL_SECONDS = 10 * 60
-DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
+DEFAULT_SESSION_TTL_SECONDS = 180 * 24 * 60 * 60
 DEFAULT_MAX_ATTEMPTS = 5
 DEFAULT_SMTP_PORT = 587
 RESEND_API_URL = "https://api.resend.com/emails"
 JSON_CONTENT_TYPE = "application/json; charset=utf-8"
+SESSION_TOKEN_VERSION = 1
 
 
 @dataclass(slots=True)
@@ -77,6 +81,7 @@ class PortalConfig:
     otp_ttl_seconds: int = DEFAULT_OTP_TTL_SECONDS
     session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    session_secret: str = ""
     smtp: SmtpConfig = field(default_factory=SmtpConfig)
     resend: ResendConfig = field(default_factory=ResendConfig)
 
@@ -100,12 +105,21 @@ class PortalSession:
 
 
 class PortalAuthStore:
-    def __init__(self, *, otp_ttl_seconds: int, session_ttl_seconds: int, max_attempts: int) -> None:
+    def __init__(
+        self,
+        *,
+        otp_ttl_seconds: int,
+        session_ttl_seconds: int,
+        max_attempts: int,
+        session_secret: str,
+    ) -> None:
         self.otp_ttl_seconds = otp_ttl_seconds
         self.session_ttl_seconds = session_ttl_seconds
         self.max_attempts = max_attempts
+        self.session_secret = session_secret.encode("utf-8") if session_secret else b""
         self._challenges: dict[str, OtpChallenge] = {}
         self._sessions: dict[str, PortalSession] = {}
+        self._revoked_tokens: dict[str, float] = {}
         self._lock = threading.Lock()
 
     def issue_challenge(self, email: str) -> tuple[str, OtpChallenge]:
@@ -166,14 +180,16 @@ class PortalAuthStore:
                 }
 
             self._challenges.pop(normalized_email, None)
-            token = secrets.token_urlsafe(32)
             session = PortalSession(
-                token=token,
+                token="",
                 email=normalized_email,
                 issued_at=now,
                 expires_at=now + self.session_ttl_seconds,
             )
-            self._sessions[token] = session
+            token = create_session_token(session, self.session_secret) if self.session_secret else secrets.token_urlsafe(32)
+            session.token = token
+            if not self.session_secret:
+                self._sessions[token] = session
             return True, "ok", {
                 "token": token,
                 "email": session.email,
@@ -189,6 +205,18 @@ class PortalAuthStore:
         now = time.time()
         with self._lock:
             self._purge_expired_locked(now)
+            revoked_expires_at = self._revoked_tokens.get(hash_session_token(normalized_token))
+            if revoked_expires_at is not None:
+                if now > revoked_expires_at:
+                    self._revoked_tokens.pop(hash_session_token(normalized_token), None)
+                else:
+                    return None
+
+            if self.session_secret:
+                session = parse_session_token(normalized_token, self.session_secret)
+                if session is not None:
+                    return session
+
             session = self._sessions.get(normalized_token)
             if session is None:
                 return None
@@ -205,7 +233,14 @@ class PortalAuthStore:
             return False
 
         with self._lock:
-            return self._sessions.pop(normalized_token, None) is not None
+            revoked = False
+            if self.session_secret:
+                session = parse_session_token(normalized_token, self.session_secret, validate_expiry=False)
+                if session is not None and time.time() <= session.expires_at:
+                    self._revoked_tokens[hash_session_token(normalized_token)] = session.expires_at
+                    revoked = True
+
+            return self._sessions.pop(normalized_token, None) is not None or revoked
 
     def _purge_expired_locked(self, now: float) -> None:
         expired_emails = [email for email, challenge in self._challenges.items() if now > challenge.expires_at]
@@ -215,6 +250,10 @@ class PortalAuthStore:
         expired_tokens = [token for token, session in self._sessions.items() if now > session.expires_at]
         for token in expired_tokens:
             self._sessions.pop(token, None)
+
+        expired_revocations = [token_hash for token_hash, expires_at in self._revoked_tokens.items() if now > expires_at]
+        for token_hash in expired_revocations:
+            self._revoked_tokens.pop(token_hash, None)
 
 
 def normalize_email(email: str) -> str:
@@ -230,11 +269,92 @@ def compare_code(challenge: OtpChallenge, code: str) -> bool:
 
 
 def hash_code(salt: str, code: str) -> str:
-    import hashlib
-
     digest = hashlib.sha256()
     digest.update(f"{salt}:{code}".encode("utf-8"))
     return digest.hexdigest()
+
+
+def hash_session_token(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def encode_token_segment(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def decode_token_segment(raw: str) -> bytes:
+    padded = str(raw or "").strip()
+    if not padded:
+        raise ValueError("Missing token segment.")
+
+    padded += "=" * (-len(padded) % 4)
+    return base64.urlsafe_b64decode(padded.encode("ascii"))
+
+
+def sign_token_segment(payload_segment: str, secret: bytes) -> str:
+    signature = hmac.new(secret, payload_segment.encode("ascii"), hashlib.sha256).digest()
+    return encode_token_segment(signature)
+
+
+def create_session_token(session: PortalSession, secret: bytes) -> str:
+    if not secret:
+        raise ValueError("Session secret is required to create a signed session token.")
+
+    payload = {
+        "v": SESSION_TOKEN_VERSION,
+        "email": normalize_email(session.email),
+        "iat": int(session.issued_at),
+        "exp": int(session.expires_at),
+    }
+    payload_segment = encode_token_segment(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    signature_segment = sign_token_segment(payload_segment, secret)
+    return f"{payload_segment}.{signature_segment}"
+
+
+def parse_session_token(token: str, secret: bytes, *, validate_expiry: bool = True) -> PortalSession | None:
+    normalized_token = str(token or "").strip()
+    if not normalized_token or not secret:
+        return None
+
+    try:
+        payload_segment, signature_segment = normalized_token.split(".", 1)
+    except ValueError:
+        return None
+
+    expected_signature = sign_token_segment(payload_segment, secret)
+    if not secrets.compare_digest(signature_segment, expected_signature):
+        return None
+
+    try:
+        payload = json.loads(decode_token_segment(payload_segment).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(payload, dict) or payload.get("v") != SESSION_TOKEN_VERSION:
+        return None
+
+    email = normalize_email(payload.get("email", ""))
+    if not is_valid_email(email):
+        return None
+
+    try:
+        issued_at = float(payload.get("iat", 0))
+        expires_at = float(payload.get("exp", 0))
+    except (TypeError, ValueError):
+        return None
+
+    if issued_at <= 0 or expires_at <= issued_at:
+        return None
+
+    if validate_expiry and time.time() > expires_at:
+        return None
+
+    return PortalSession(
+        token=normalized_token,
+        email=email,
+        issued_at=issued_at,
+        expires_at=expires_at,
+    )
 
 
 def to_millis(value: float) -> int:
@@ -317,6 +437,11 @@ def load_config() -> PortalConfig:
         from_email=os.getenv("PORTAL_RESEND_FROM_EMAIL", "").strip(),
         from_name=os.getenv("PORTAL_RESEND_FROM_NAME", DEFAULT_PRODUCT_NAME).strip() or DEFAULT_PRODUCT_NAME,
     )
+    session_secret = resolve_session_secret(
+        explicit_secret=os.getenv("PORTAL_SESSION_SECRET", "").strip(),
+        smtp=smtp,
+        resend=resend,
+    )
 
     return PortalConfig(
         product_name=os.getenv("PORTAL_PRODUCT_NAME", DEFAULT_PRODUCT_NAME).strip() or DEFAULT_PRODUCT_NAME,
@@ -324,6 +449,7 @@ def load_config() -> PortalConfig:
         otp_ttl_seconds=read_int_env("PORTAL_OTP_TTL_SECONDS", DEFAULT_OTP_TTL_SECONDS),
         session_ttl_seconds=read_int_env("PORTAL_SESSION_TTL_SECONDS", DEFAULT_SESSION_TTL_SECONDS),
         max_attempts=read_int_env("PORTAL_OTP_MAX_ATTEMPTS", DEFAULT_MAX_ATTEMPTS),
+        session_secret=session_secret,
         smtp=smtp,
         resend=resend,
     )
@@ -335,6 +461,19 @@ def normalize_mail_provider(value: str) -> str:
         return provider
 
     return DEFAULT_MAIL_PROVIDER
+
+
+def resolve_session_secret(*, explicit_secret: str, smtp: SmtpConfig, resend: ResendConfig) -> str:
+    if explicit_secret:
+        return explicit_secret
+
+    if resend.api_key:
+        return resend.api_key
+
+    if smtp.password:
+        return smtp.password
+
+    return ""
 
 
 def build_otp_email_subject(config: PortalConfig) -> str:
@@ -831,6 +970,7 @@ def create_server(host: str, port: int, root: Path, config: PortalConfig) -> Thr
         otp_ttl_seconds=config.otp_ttl_seconds,
         session_ttl_seconds=config.session_ttl_seconds,
         max_attempts=config.max_attempts,
+        session_secret=config.session_secret,
     )  # type: ignore[attr-defined]
     return server
 
@@ -857,6 +997,18 @@ def main() -> int:
     provider = normalize_mail_provider(config.mail_provider)
 
     print(f"Portal server listening on http://{args.host}:{args.port}/portal/", flush=True)
+    if config.session_secret:
+        print(
+            f"Signed sessions enabled. Default session lifetime is {config.session_ttl_seconds // 86400} days.",
+            flush=True,
+        )
+    else:
+        print(
+            "Session signing is not configured, so sessions will be lost on redeploy. "
+            "Set PORTAL_SESSION_SECRET or configure mail credentials with a stable secret.",
+            flush=True,
+        )
+
     if provider == "resend":
         if config.resend.configured:
             print("Using Resend for OTP delivery.", flush=True)

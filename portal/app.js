@@ -46,8 +46,6 @@ const DEFAULT_PROMPT = {
     "Service area, hours, pricing hints, and any details the agent should know before replying.",
   escalationGuidance:
     "Hand off when the customer is upset, the answer needs a human decision, or the request is urgent.",
-  approvalGuidance:
-    "When a WhatsApp message arrives, format the bot message with who sent it, the latest message, and one suggested reply. Keep send manual and make Edit open the approval page with the draft prefilled.",
   exampleReplies:
     "Good: \"Yes, I can help. What is the address?\"\nBad: \"Sure, anything is possible.\"",
   responseStyle: "balanced",
@@ -64,12 +62,10 @@ const DEFAULT_FEATURES = [
   {
     id: "whatsapp-business-reply-suggestion-assistant",
     name: "WhatsApp Reply Assistant",
-    description:
-      "Drafts suggested WhatsApp replies, keeps sending manual, and opens the reusable approval page when someone wants to review or revise the draft.",
+    description: "Drafts suggested WhatsApp replies and keeps sending manual.",
     channel: "WhatsApp",
     mode: "Human-reviewed",
     status: "Active",
-    approvalUrl: LOCAL_APPROVAL_URL,
     prompt: { ...DEFAULT_PROMPT },
   },
 ];
@@ -145,7 +141,7 @@ const SIMULATOR_PRESETS = {
     latestMessage: SCENARIOS.approval.user,
     threadContext:
       "Can you fit me in later today?\nI can check my calendar now.\nIf not, tomorrow afternoon works too.",
-    approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
+    approvalUrl: LOCAL_APPROVAL_URL,
   },
   availability: {
     senderName: SCENARIOS.availability.sender,
@@ -153,7 +149,7 @@ const SIMULATOR_PRESETS = {
     latestMessage: SCENARIOS.availability.user,
     threadContext:
       "Hi, are you available tomorrow afternoon?\nLet me check the schedule.\nGreat, thanks.",
-    approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
+    approvalUrl: LOCAL_APPROVAL_URL,
   },
   pricing: {
     senderName: SCENARIOS.pricing.sender,
@@ -161,7 +157,7 @@ const SIMULATOR_PRESETS = {
     latestMessage: SCENARIOS.pricing.user,
     threadContext:
       "How much would it cost to replace the lock?\nI can quote it once I know the lock type.\nGot it, I’ll send a photo.",
-    approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
+    approvalUrl: LOCAL_APPROVAL_URL,
   },
   reschedule: {
     senderName: SCENARIOS.reschedule.sender,
@@ -169,7 +165,7 @@ const SIMULATOR_PRESETS = {
     latestMessage: SCENARIOS.reschedule.user,
     threadContext:
       "Can we move the appointment by one day?\nYes, I can check what’s open.\nPerfect.",
-    approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
+    approvalUrl: LOCAL_APPROVAL_URL,
   },
   urgent: {
     senderName: SCENARIOS.urgent.sender,
@@ -177,7 +173,7 @@ const SIMULATOR_PRESETS = {
     latestMessage: SCENARIOS.urgent.user,
     threadContext:
       "The door is stuck and I need help right now.\nI’m escalating this to a person immediately.\nThanks, please hurry.",
-    approvalUrl: DEFAULT_FEATURES[0].approvalUrl,
+    approvalUrl: LOCAL_APPROVAL_URL,
   },
 };
 
@@ -241,13 +237,10 @@ const elements = {
   businessNotes: document.querySelector("#businessNotes"),
   escalationGuidance: document.querySelector("#escalationGuidance"),
   exampleReplies: document.querySelector("#exampleReplies"),
-  approvalGuidance: document.querySelector("#approvalGuidance"),
-  approvalUrlInput: document.querySelector("#approvalUrlInput"),
   scenarioSelect: document.querySelector("#scenarioSelect"),
   scenarioMessage: document.querySelector("#scenarioMessage"),
   responseMessage: document.querySelector("#responseMessage"),
   approvalSender: document.querySelector("#approvalSender"),
-  approvalUrlNote: document.querySelector("#approvalUrlNote"),
   compiledPrompt: document.querySelector("#compiledPrompt"),
   copyButton: document.querySelector("#copyButton"),
   simulatorPresetSelect: document.querySelector("#simulatorPresetSelect"),
@@ -717,7 +710,6 @@ function loadClientState(email) {
         ? DEFAULT_FEATURES[0].mode
         : String(feature?.mode || "Default"),
       status: String(feature?.status || "Active"),
-      approvalUrl: String(feature?.approvalUrl || DEFAULT_FEATURES[0].approvalUrl || ""),
       prompt: normalizePrompt(feature?.prompt || {}, fallbackPrompt),
     };
   });
@@ -745,7 +737,6 @@ function normalizePrompt(prompt = {}, fallback = DEFAULT_PROMPT) {
     replyRules: String(base.replyRules || DEFAULT_PROMPT.replyRules),
     businessNotes: String(base.businessNotes || DEFAULT_PROMPT.businessNotes),
     escalationGuidance: String(base.escalationGuidance || DEFAULT_PROMPT.escalationGuidance),
-    approvalGuidance: String(base.approvalGuidance || DEFAULT_PROMPT.approvalGuidance),
     exampleReplies: String(base.exampleReplies || DEFAULT_PROMPT.exampleReplies),
     responseStyle: ["short", "balanced", "detailed"].includes(responseStyle)
       ? responseStyle
@@ -818,6 +809,10 @@ function setView(view) {
 }
 
 function setStatus(message) {
+  if (!elements.saveState) {
+    return;
+  }
+
   const time = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
@@ -1037,10 +1032,6 @@ function buildCompiledPrompt(feature = getSelectedFeature()) {
     "",
     "Escalation rules",
     ...bulletList(splitLines(prompt.escalationGuidance)),
-    "",
-    "Approval handoff",
-    ...bulletList(splitLines(prompt.approvalGuidance)),
-    `- Edit opens ${feature?.approvalUrl?.trim() || "the configured approval page"}`,
     "",
     "Example replies",
     ...bulletList(splitLines(prompt.exampleReplies)),
@@ -1661,13 +1652,7 @@ function updatePromptFields() {
   elements.replyRules.value = prompt.replyRules;
   elements.businessNotes.value = prompt.businessNotes;
   elements.escalationGuidance.value = prompt.escalationGuidance;
-  elements.approvalGuidance.value = prompt.approvalGuidance;
   elements.exampleReplies.value = prompt.exampleReplies;
-}
-
-function updateApprovalFields() {
-  const feature = getSelectedFeature();
-  elements.approvalUrlInput.value = feature?.approvalUrl || "";
 }
 
 function updateTabButtons() {
@@ -1752,14 +1737,10 @@ function syncSettingsPanelState() {
 function updatePreview() {
   const prompt = getSelectedPrompt();
   const scenario = SCENARIOS[prompt.scenario] ?? SCENARIOS.availability;
-  const feature = getSelectedFeature();
   elements.scenarioSelect.value = prompt.scenario;
   elements.approvalSender.textContent = scenario.sender || "Customer";
   elements.scenarioMessage.textContent = scenario.user;
   elements.responseMessage.textContent = buildResponseText(prompt);
-  elements.approvalUrlNote.textContent = feature?.approvalUrl?.trim()
-    ? `Edit opens ${feature.approvalUrl.trim()}`
-    : "Edit opens the configured approval page.";
   elements.compiledPrompt.textContent = buildCompiledPrompt();
 }
 
@@ -1777,7 +1758,6 @@ function renderApp() {
   updateFeatureList();
   updateFeatureStudioHeader();
   updatePromptFields();
-  updateApprovalFields();
   updatePreview();
   updateSimulatorPanel();
   updateSettingsButtons();
@@ -2269,24 +2249,6 @@ function syncSettingsField(key) {
   };
 }
 
-function syncFeatureField(key) {
-  return (event) => {
-    const feature = getSelectedFeature();
-
-    if (!feature) {
-      return;
-    }
-
-    feature[key] = event.target.value;
-    persistClientState();
-    updateHeader();
-    updateFeatureStudioHeader();
-    updateApprovalFields();
-    updatePreview();
-    setStatus("Autosaved locally");
-  };
-}
-
 function handleMenuAction(action) {
   if (action === "account") {
     openSettings("account");
@@ -2495,10 +2457,8 @@ function bindEvents() {
   elements.replyRules.addEventListener("input", syncPromptField("replyRules"));
   elements.businessNotes.addEventListener("input", syncPromptField("businessNotes"));
   elements.escalationGuidance.addEventListener("input", syncPromptField("escalationGuidance"));
-  elements.approvalGuidance.addEventListener("input", syncPromptField("approvalGuidance"));
   elements.exampleReplies.addEventListener("input", syncPromptField("exampleReplies"));
   elements.scenarioSelect.addEventListener("change", syncPromptField("scenario"));
-  elements.approvalUrlInput.addEventListener("input", syncFeatureField("approvalUrl"));
 
   elements.displayNameInput.addEventListener("input", syncSettingsField("displayName"));
   elements.workspaceNameInput.addEventListener("input", syncSettingsField("workspaceName"));

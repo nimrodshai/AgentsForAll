@@ -53,11 +53,7 @@ features:
     status: active
     channel: whatsapp
     mode: approval_bot
-    description: Drafts suggested replies, posts them to an internal approval bot, and opens a hosted edit page for revised approval.
-    handoff:
-      approval_url: ""
-      send_label: Send
-      edit_label: Edit
+    description: Drafts suggested replies for active WhatsApp conversations and keeps the final send manual.
 
 agent:
   name: "Assistant"

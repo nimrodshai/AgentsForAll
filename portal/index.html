@@ -11,7 +11,7 @@
     <meta name="portal-api-base" content="" />
     <link rel="stylesheet" href="./styles.css?v=29" />
   </head>
-  <body data-view="boot">
+  <body data-view="auth">
     <div class="orb orb-left" aria-hidden="true"></div>
     <div class="orb orb-right" aria-hidden="true"></div>
     <div class="mesh" aria-hidden="true"></div>
@@ -158,11 +158,6 @@
         </nav>
 
         <div class="topbar-actions">
-          <span id="saveState" class="status-pill">
-            <span class="status-dot"></span>
-            Autosaved locally
-          </span>
-
           <div class="menu-wrap">
             <button
               id="accountMenuButton"
@@ -209,11 +204,11 @@
             <span aria-hidden="true">&lt;</span>
             <span>Back to tools</span>
           </button>
+          <p class="eyebrow feature-page-header-label">Tool studio</p>
           <span id="featureStudioStatus" class="feature-status">Active</span>
         </header>
 
         <div class="feature-page-intro">
-          <p class="eyebrow">Tool studio</p>
           <h1 id="featureStudioTitle">Tool name</h1>
           <p id="featureStudioDescription" class="feature-page-description">
             Tool details appear here.
@@ -299,29 +294,6 @@ Bad: 'Sure, anything is possible.'"
             </label>
           </article>
 
-          <article class="glass-card config-card">
-            <div class="card-head">
-              <h3>Approval handoff</h3>
-            </div>
-
-            <label class="field">
-              <span>How the bot should package the draft</span>
-              <textarea
-                id="approvalGuidance"
-                rows="4"
-                placeholder="When a WhatsApp message arrives, format the bot message with who sent it, the latest message, and one suggested reply. Keep send manual and make Edit open the hosted approval page with the draft prefilled."
-              ></textarea>
-            </label>
-
-            <label class="field compact">
-              <span>Edit URL</span>
-              <input
-                id="approvalUrlInput"
-                type="url"
-                placeholder="https://approval.example.com/review"
-              />
-            </label>
-          </article>
         </div>
       </section>
 
@@ -329,7 +301,7 @@ Bad: 'Sure, anything is possible.'"
         <div class="panel-intro">
           <div>
             <p class="eyebrow">Preview</p>
-            <h1>See the approval handoff before it goes live.</h1>
+            <h1>See the draft before it goes live.</h1>
             <p class="lede compact">
               Clients can test a scenario, review the generated instruction, and copy
               the compiled prompt if needed.
@@ -376,9 +348,7 @@ Bad: 'Sure, anything is possible.'"
                 <button class="ghost-button small" type="button">Edit</button>
               </div>
 
-              <p id="approvalUrlNote" class="approval-note">
-                Edit opens the configured approval page.
-              </p>
+              <p class="approval-note">Edit stays manual in this preview.</p>
             </div>
           </article>
 

@@ -55,7 +55,7 @@ How the client talks to the agent.
 
 ### `features`
 
-Assigned capabilities that the client should see in the portal and approval workflow.
+Assigned capabilities that the client should see in the portal.
 
 - `id`: stable slug for the capability
 - `name`: display name in the portal
@@ -63,8 +63,6 @@ Assigned capabilities that the client should see in the portal and approval work
 - `channel`: where the capability lives, such as `whatsapp`
 - `mode`: short label for the operating mode, such as `approval_bot`
 - `description`: short summary of what the feature does
-- `handoff.approval_url`: URL opened by the Edit action for review and send
-- `handoff.send_label` and `handoff.edit_label`: optional button copy overrides
 
 ### `backend.json`
 

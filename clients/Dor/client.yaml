@@ -50,20 +50,12 @@ features:
     channel: whatsapp
     mode: approval_bot
     description: Drafts suggested replies for active WhatsApp conversations and keeps the final send manual.
-    handoff:
-      approval_url: ""
-      send_label: Send
-      edit_label: Edit
   - id: whatsapp-business-follow-up-outreach-writer
     name: WhatsApp Follow-Up Outreach Writer
     status: draft
     channel: whatsapp
     mode: follow_up_writer
     description: Drafts copy-ready outreach messages from exported WhatsApp conversations for re-engaging old clients.
-    handoff:
-      approval_url: ""
-      send_label: Send
-      edit_label: Edit
 
 agent:
   name: "Assistant"
