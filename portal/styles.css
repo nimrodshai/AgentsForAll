@@ -1749,6 +1749,7 @@ a {
   gap: 0.85rem;
   width: min(100%, 76rem);
   padding-top: 0.35rem;
+  justify-self: center;
 }
 
 .feature-page-intro h1 {
@@ -1803,6 +1804,7 @@ a {
   display: grid;
   gap: 0.85rem;
   width: min(100%, 60rem);
+  justify-self: center;
 }
 
 .empty-state {
