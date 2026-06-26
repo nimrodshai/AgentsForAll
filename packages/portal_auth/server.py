@@ -417,7 +417,7 @@ def build_otp_email_html(config: PortalConfig, code: str) -> str:
               </td>
             </tr>
             <tr>
-              <td style="padding:20px 32px 0;text-align:center;">
+              <td style="padding:20px 32px 36px;text-align:center;">
                 <p style="margin:0;color:#647482;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;">
                   If you did not request this code, you can safely ignore this email.
                 </p>
