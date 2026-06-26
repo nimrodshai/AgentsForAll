@@ -835,7 +835,7 @@ a {
 
 .brand-logo {
   display: block;
-  height: clamp(4.75rem, 7.5vw, 5.75rem);
+  height: clamp(5rem, 7.8vw, 6.2rem);
   width: auto;
 }
 
@@ -1747,13 +1747,13 @@ a {
 .feature-page-intro {
   display: grid;
   gap: 0.85rem;
-  width: min(100%, 72rem);
+  width: min(100%, 76rem);
   padding-top: 0.35rem;
 }
 
 .feature-page-intro h1 {
   margin: 0;
-  max-width: 14ch;
+  max-width: 20ch;
   font-family: var(--font-display);
   font-size: clamp(2.6rem, 5vw, 4.8rem);
   letter-spacing: -0.05em;
@@ -1763,7 +1763,7 @@ a {
 
 .feature-page-description {
   margin: 0;
-  max-width: 56ch;
+  max-width: 70ch;
   color: var(--muted);
   font-size: 1.12rem;
   line-height: 1.68;
@@ -1934,12 +1934,12 @@ a {
   }
 
   .feature-page-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.65rem;
   }
 
   .feature-page-header-label {
-    grid-column: 1 / -1;
     justify-self: center;
   }
 }
@@ -1977,8 +1977,8 @@ a {
 
   .feature-page-header {
     position: static;
-    grid-template-columns: 1fr;
-    gap: 0.7rem;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.55rem;
   }
 
   .brand-block {
@@ -2020,19 +2020,26 @@ a {
     align-items: flex-start;
   }
 
-  .feature-back-button,
-  .feature-page-header-label,
-  .feature-page-header .feature-status {
+  .feature-back-button {
     justify-self: start;
   }
 
+  .feature-page-header-label {
+    justify-self: center;
+  }
+
+  .feature-page-header .feature-status {
+    justify-self: end;
+  }
+
   .feature-page-description {
-    max-width: 42ch;
+    max-width: 52ch;
     font-size: 1.02rem;
   }
 
   .feature-page-intro h1 {
     font-size: clamp(2.2rem, 11vw, 3.2rem);
+    max-width: 18ch;
   }
 
   .preview-canvas {
