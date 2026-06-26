@@ -61,6 +61,30 @@ body[data-view="auth"] {
   overflow: auto;
 }
 
+body[data-view="boot"] {
+  overflow: hidden;
+}
+
+body[data-view="boot"] #authView,
+body[data-view="boot"] #appView {
+  visibility: hidden;
+}
+
+body[data-view="boot"]::after {
+  content: "ASSISTYCA";
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 2;
+}
+
 body[data-view="auth"]::before {
   background-image:
     linear-gradient(rgba(20, 28, 38, 0.01) 1px, transparent 1px),
