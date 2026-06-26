@@ -2308,6 +2308,11 @@ async function bootstrapAuthState() {
   authChallenge = normalizeStoredChallenge(loadJson(AUTH_CHALLENGE_KEY, null));
 
   if (authSession?.token) {
+    activeEmail = normalizeEmail(authSession.email || "");
+    clientState = loadClientState(activeEmail);
+    state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
+    refreshView();
+
     try {
       const response = await apiRequest("/api/auth/session", {
         headers: {
@@ -2325,12 +2330,16 @@ async function bootstrapAuthState() {
       clientState = loadClientState(activeEmail);
       state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
       clearAuthChallenge();
-    } catch {
-      const previousEmail = normalizeEmail(authSession?.email || authChallenge?.email || "");
-      clearAuthSession();
-      activeEmail = normalizeEmail(authChallenge?.email || previousEmail);
-      clientState = loadClientState(activeEmail);
-      state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
+      persistJson(AUTH_SESSION_KEY, authSession);
+    } catch (error) {
+      const status = Number(error?.status || 0);
+      if (status === 401 || status === 403) {
+        const previousEmail = normalizeEmail(authSession?.email || authChallenge?.email || "");
+        clearAuthSession();
+        activeEmail = normalizeEmail(authChallenge?.email || previousEmail);
+        clientState = loadClientState(activeEmail);
+        state.selectedSimulatorId = clientState.simulator.selectedApprovalId || clientState.simulator.approvals[0]?.approvalId || null;
+      }
     }
   } else {
     activeEmail = normalizeEmail(authChallenge?.email || "");
