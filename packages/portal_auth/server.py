@@ -423,13 +423,6 @@ def build_otp_email_html(config: PortalConfig, code: str) -> str:
                 </p>
               </td>
             </tr>
-            <tr>
-              <td style="padding:24px 32px 36px;text-align:center;">
-                <p style="margin:0;color:#90a0ad;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;">
-                  Sent by {product_name}
-                </p>
-              </td>
-            </tr>
           </table>
         </td>
       </tr>
