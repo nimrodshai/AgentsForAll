@@ -20,13 +20,13 @@ This repository uses a reusable JSON spec plus a PDF generator script to lock cl
 ## Example
 
 ```bash
-python3 scripts/generate_spec_pdf.py clients/whatsapp-reply-assistant/spec/spec.json
+python3 scripts/generate_spec_pdf.py clients/Dor/spec/spec.json
 ```
 
 To write the PDF somewhere else:
 
 ```bash
-python3 scripts/generate_spec_pdf.py clients/whatsapp-reply-assistant/spec/spec.json --output /tmp/whatsapp-reply-assistant-spec.pdf
+python3 scripts/generate_spec_pdf.py clients/Dor/spec/spec.json --output /tmp/Dor-spec.pdf
 ```
 
 ## Fields
@@ -50,5 +50,7 @@ The `sections` object may include:
 ## Notes
 
 - The same spec structure should work for future clients.
+- The PDF generator automatically places `assets/AssistycaLogo.png` in the page header.
+- When list items are prefixed with `Tool 1:` or `Tool 2:`, the generator collapses them into tool headers with grouped bullets or numbered workflows.
 - Update the JSON when scope changes, then regenerate the PDF.
 - Keep the source JSON under version control so scope changes are easy to review.

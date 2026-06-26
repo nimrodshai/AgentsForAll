@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "title": "Project Scope Spec",
+    "client_name": "Dor",
+    "project_name": "WhatsApp Business Reply Suggestion Assistant",
+    "prepared_by": "Codex",
+    "date": "2026-06-26",
+    "status": "Draft",
+    "language": "en"
+  },
+  "overview": {
+    "client_request": "The scope includes two separate tools:\nTool 1: A WhatsApp reply assistant for active conversations. It reads the current thread, understands the context, drafts a reply suggestion in the owner’s tone, and leaves the final send action to the owner.\nTool 2: A follow-up outreach writer for old clients. The owner can export a past WhatsApp conversation, upload it into the workspace, and get a copy-ready message for re-engaging that client and trying to win another job."
+  },
+  "sections": {
+    "deliverables": [
+      "Tool 1: A WhatsApp bot for reviewing incoming customer messages and surfacing reply suggestions.",
+      "Tool 1: A private workspace for editing the assistant's tone and knowledge.",
+      "Tool 1: A reply suggestion drafted from the current WhatsApp conversation.",
+      "Tool 2: A workspace upload flow for exported WhatsApp conversations.",
+      "Tool 2: A copy-ready follow-up outreach suggestion drafted from the uploaded conversation context."
+    ],
+    "workflow": [
+      "Tool 1: A customer sends a message in WhatsApp Business.",
+      "Tool 1: The bot captures the new message and loads the thread context.",
+      "Tool 1: The assistant uses the configured tone and knowledge from the private workspace to draft one suggested reply.",
+      "Tool 1: The WhatsApp bot shows the suggested reply drafted by the assistant.",
+      "Tool 1: The owner reviews and edits the suggestion.",
+      "Tool 1: The owner sends the final reply manually in WhatsApp Business.",
+      "Tool 2: The owner exports an older WhatsApp conversation from a past client thread.",
+      "Tool 2: The owner uploads the exported conversation into the workspace feature.",
+      "Tool 2: The assistant reads the conversation context and drafts a follow-up outreach message for re-engaging the old client.",
+      "Tool 2: The owner copies the suggested message and sends it manually to the old client."
+    ]
+  }
+}

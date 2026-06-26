@@ -1,4 +1,4 @@
-# AgentsForAll Working Rules
+# Assistyca Working Rules
 
 This file is the default operating guide for work in this repository.
 

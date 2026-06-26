@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: agents-for-all-portal
+    name: assistyca-portal
     env: python
     plan: free
     autoDeploy: true
+    branch: main
     buildCommand: python3 -m pip install -r requirements.txt
     startCommand: python3 -u scripts/run_portal_server.py --host 0.0.0.0 --port $PORT
     healthCheckPath: /portal/
@@ -11,9 +12,9 @@ services:
       - key: PORTAL_MAIL_PROVIDER
         value: resend
       - key: PORTAL_PRODUCT_NAME
-        value: Workspace
+        value: Assistyca
       - key: PORTAL_RESEND_FROM_NAME
-        value: Workspace
+        value: Assistyca
       - key: PORTAL_RESEND_API_KEY
         sync: false
       - key: PORTAL_RESEND_FROM_EMAIL

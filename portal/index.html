@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign in</title>
+    <title>Assistyca</title>
     <meta
       name="description"
-      content="Enter your email to receive a one-time code and continue into the workspace."
+      content="Enter your email to receive a one-time code and continue into Assistyca."
     />
     <meta name="portal-api-base" content="" />
     <link rel="stylesheet" href="./styles.css?v=27" />
@@ -146,12 +146,12 @@
     </main>
 
     <section id="appView" class="app-shell is-hidden">
-      <header class="app-bar">
+      <header id="appBar" class="app-bar">
         <div class="brand-block">
-          <p class="eyebrow">Workspace</p>
+          <p class="eyebrow">Assistyca</p>
         </div>
 
-        <nav class="tab-strip" aria-label="Workspace tabs">
+        <nav class="tab-strip" aria-label="Assistyca tabs">
           <button class="tab-button is-active" data-tab="features" type="button">Features</button>
           <button class="tab-button" data-tab="preview" type="button">Preview</button>
           <button class="tab-button" data-tab="simulator" type="button">Simulator</button>
@@ -202,22 +202,23 @@
         <div id="featureList" class="feature-list-grid"></div>
       </section>
 
-      <section id="featureStudioPanel" class="tab-panel is-hidden">
-        <div class="studio-hero glass-card">
-          <div class="studio-hero-top">
-            <button id="backToFeaturesButton" class="ghost-button small" type="button">
-              Back to features
-            </button>
-            <span id="featureStudioStatus" class="feature-status">Active</span>
-          </div>
+      <section id="featureStudioPanel" class="tab-panel feature-page is-hidden">
+        <header class="feature-page-header">
+          <button id="backToFeaturesButton" class="feature-back-button" type="button">
+            <span aria-hidden="true">&lt;</span>
+            <span>Back</span>
+          </button>
+          <span id="featureStudioStatus" class="feature-status">Active</span>
+        </header>
 
+        <div class="feature-page-intro">
           <p class="eyebrow">Feature studio</p>
           <h1 id="featureStudioTitle">Feature name</h1>
-          <p id="featureStudioDescription" class="lede compact">
+          <p id="featureStudioDescription" class="feature-page-description">
             Feature details appear here.
           </p>
 
-          <div class="feature-meta studio-meta">
+          <div class="feature-meta feature-page-meta">
             <span id="featureStudioChannel">Channel: Web</span>
             <span id="featureStudioMode">Mode: Default</span>
           </div>
@@ -616,7 +617,7 @@ Owner said afternoons are easier."
 
               <label class="field">
                 <span>Workspace name</span>
-                <input id="workspaceNameInput" type="text" placeholder="Agent guidance studio" />
+                <input id="workspaceNameInput" type="text" placeholder="Assistyca" />
               </label>
 
               <label class="field">
@@ -636,6 +637,6 @@ Owner said afternoons are easier."
       </section>
     </section>
 
-    <script src="./app.js?v=30"></script>
+    <script src="./app.js?v=31"></script>
   </body>
 </html>

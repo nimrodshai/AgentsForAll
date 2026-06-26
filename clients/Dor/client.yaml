@@ -1,0 +1,114 @@
+# Starter client config for Dor.
+# Replace the placeholder values with the real client details before using in production.
+
+client:
+  id: dor
+  name: Dor
+  industry: general
+  status: draft
+  owner: ""
+  timezone: Asia/Jerusalem
+  locale: en-IL
+  language: en
+
+contact:
+  primary_contact_name: ""
+  primary_contact_email: ""
+  primary_contact_phone: ""
+  website: ""
+
+business:
+  service_area: []
+  business_hours:
+    monday: ""
+    tuesday: ""
+    wednesday: ""
+    thursday: ""
+    friday: ""
+    saturday: ""
+    sunday: ""
+  core_services: []
+  pricing_notes: ""
+  service_rules:
+    - "Do not promise a price without checking the pricing policy."
+    - "Escalate urgent jobs to a human."
+
+channels:
+  primary: whatsapp
+  whatsapp:
+    enabled: true
+    business_account_id: ""
+    phone_number_id: ""
+    display_name: "Dor"
+    webhook_path: /webhooks/whatsapp
+    mode: suggestion_only
+
+features:
+  - id: whatsapp-business-reply-suggestion-assistant
+    name: WhatsApp Reply Approval Bot
+    status: draft
+    channel: whatsapp
+    mode: approval_bot
+    description: Drafts suggested replies for active WhatsApp conversations and keeps the final send manual.
+    handoff:
+      approval_url: ""
+      send_label: Send
+      edit_label: Edit
+  - id: whatsapp-business-follow-up-outreach-writer
+    name: WhatsApp Follow-Up Outreach Writer
+    status: draft
+    channel: whatsapp
+    mode: follow_up_writer
+    description: Drafts copy-ready outreach messages from exported WhatsApp conversations for re-engaging old clients.
+    handoff:
+      approval_url: ""
+      send_label: Send
+      edit_label: Edit
+
+agent:
+  name: "Assistant"
+  purpose: "Suggest helpful replies and follow-up outreach drafts for customer messages."
+  tone:
+    style: friendly
+    formality: medium
+    brevity: concise
+  capabilities:
+    - intake
+    - reply_suggestions
+    - summarize_thread
+    - extract_job_details
+    - follow_up_outreach
+  response_policy:
+    require_human_review: true
+    can_send_messages: false
+    can_edit_knowledge: false
+
+knowledge:
+  sources:
+    - knowledge/faq.md
+    - knowledge/services.md
+    - knowledge/pricing.md
+    - knowledge/policies.md
+  notes: ""
+
+integrations:
+  calendar: none
+  crm: none
+  payments: none
+  storage: local
+
+guardrails:
+  never_guess_prices: true
+  never_share_secrets: true
+  never_make_legal_or_medical_claims: true
+  escalate_when:
+    - unclear_scope
+    - emergency
+    - payment_dispute
+    - out_of_hours_exception
+
+ops:
+  created_at: ""
+  updated_at: ""
+  tags: []
+  notes: ""

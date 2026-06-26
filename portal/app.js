@@ -1,8 +1,17 @@
-const STORAGE_PREFIX = "agents-for-all";
+const LEGACY_STORAGE_PREFIX = "agents-for-all";
+const STORAGE_PREFIX = "assistyca";
+const LEGACY_WORKSPACE_NAMES = new Set([
+  "agent guidance studio",
+  "agents for all",
+  "guidance studio",
+  "lalo",
+  "workspace",
+]);
 const AUTH_SESSION_KEY = `${STORAGE_PREFIX}.portal.auth-session`;
 const AUTH_CHALLENGE_KEY = `${STORAGE_PREFIX}.portal.auth-challenge`;
 const CLIENT_STATE_PREFIX = `${STORAGE_PREFIX}.client-state`;
 const LAST_PRIMARY_TAB_KEY = `${STORAGE_PREFIX}.portal.last-primary-tab`;
+migrateLegacyStorage();
 const PORTAL_API_BASE = resolvePortalApiBase();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const SETTINGS_PANEL_ANIMATION_MS = 320;
@@ -30,7 +39,7 @@ const DEFAULT_PROMPT = {
 
 const DEFAULT_SETTINGS = {
   displayName: "",
-  workspaceName: "Agent guidance studio",
+  workspaceName: "Assistyca",
   timezone: defaultTimeZone(),
 };
 
@@ -64,6 +73,18 @@ const DEFAULT_SIMULATOR = {
 
 function normalizeTab(tab) {
   return TAB_ALIASES.get(String(tab || "").trim()) || String(tab || "").trim();
+}
+
+function normalizeBrandName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[\s_-]+/g, " ");
+}
+
+function isLegacyWorkspaceName(value) {
+  return LEGACY_WORKSPACE_NAMES.has(normalizeBrandName(value));
 }
 
 const SCENARIOS = {
@@ -178,6 +199,7 @@ const elements = {
   workspaceTitle: document.querySelector("#workspaceTitle"),
   workspaceSubtitle: document.querySelector("#workspaceSubtitle"),
   saveState: document.querySelector("#saveState"),
+  appBar: document.querySelector("#appBar"),
   featureList: document.querySelector("#featureList"),
   featureStudioPanel: document.querySelector("#featureStudioPanel"),
   backToFeaturesButton: document.querySelector("#backToFeaturesButton"),
@@ -293,6 +315,37 @@ function persistJson(key, value) {
     }
 
     window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Keep the app usable when local storage is restricted.
+  }
+}
+
+function migrateLegacyStorage() {
+  try {
+    const legacyPrefix = `${LEGACY_STORAGE_PREFIX}.`;
+    const nextPrefix = `${STORAGE_PREFIX}.`;
+    const keysToMove = [];
+
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key && key.startsWith(legacyPrefix)) {
+        keysToMove.push(key);
+      }
+    }
+
+    for (const legacyKey of keysToMove) {
+      const nextKey = legacyKey.replace(legacyPrefix, nextPrefix);
+      const value = window.localStorage.getItem(legacyKey);
+      if (value === null) {
+        continue;
+      }
+
+      if (window.localStorage.getItem(nextKey) === null) {
+        window.localStorage.setItem(nextKey, value);
+      }
+
+      window.localStorage.removeItem(legacyKey);
+    }
   } catch {
     // Keep the app usable when local storage is restricted.
   }
@@ -647,10 +700,9 @@ function loadClientState(email) {
     };
   });
   const settings = { ...DEFAULT_SETTINGS, ...(saved.settings || {}) };
-  const workspaceName = String(settings.workspaceName || "").trim().toLowerCase();
   const simulator = normalizeSimulatorState(savedSimulator, savedPrompt);
 
-  if (!settings.workspaceName || workspaceName === "guidance studio") {
+  if (!settings.workspaceName || isLegacyWorkspaceName(settings.workspaceName)) {
     settings.workspaceName = DEFAULT_SETTINGS.workspaceName;
   }
 
@@ -720,7 +772,7 @@ function getWorkspaceName() {
     return DEFAULT_SETTINGS.workspaceName;
   }
 
-  if (workspaceName.toLowerCase() === "guidance studio") {
+  if (isLegacyWorkspaceName(workspaceName)) {
     return DEFAULT_SETTINGS.workspaceName;
   }
 
@@ -1557,13 +1609,18 @@ function openFeatureStudio(featureId) {
   closeMenu();
   setHashForTab("features", feature.id);
   renderApp();
+  window.scrollTo(0, 0);
 }
 
 function closeFeatureStudio() {
   state.selectedFeatureId = null;
   state.activeTab = "features";
+  state.lastPrimaryTab = "features";
+  persistLastPrimaryTab();
+  closeMenu();
   setHashForTab("features");
   renderApp();
+  window.scrollTo(0, 0);
 }
 
 function updateFeatureStudioHeader() {
@@ -1620,6 +1677,8 @@ function updateSettingsButtons() {
 
 function updatePanelVisibility() {
   const inStudio = state.activeTab === "features" && Boolean(state.selectedFeatureId);
+  elements.appBar.classList.toggle("is-hidden", inStudio);
+  elements.appView.classList.toggle("is-feature-page", inStudio);
   elements.featuresPanel.classList.toggle("is-hidden", state.activeTab !== "features" || inStudio);
   elements.featureStudioPanel.classList.toggle("is-hidden", !inStudio);
   elements.previewPanel.classList.toggle("is-hidden", state.activeTab !== "preview");
