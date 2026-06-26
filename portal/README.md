@@ -1,6 +1,6 @@
-# Agent guidance studio
+# Assistyca Portal
 
-This folder holds the client-facing workspace for reviewing assigned features, opening a feature studio, editing reply settings, and previewing agent responses.
+This folder holds the client-facing portal for reviewing assigned features, opening a feature studio, editing reply settings, and previewing agent responses.
 
 It is intentionally separate from the reusable spec and client config layers.
 
@@ -10,12 +10,12 @@ It is intentionally separate from the reusable spec and client config layers.
 - `styles.css` for the interface
 - `app.js` for the OTP sign-in flow, tab state, account menu, and preview behavior
 
-## Workspace layout
+## Portal layout
 
 - `Features` for the client account and its assigned capabilities. Click one to open its studio.
 - `Preview` for testing a reply before it is used
 - `Simulator` for queuing browser-local WhatsApp mock messages, drafting a reply, and simulating send/edit actions without a backend
-- `Settings` opens as a modal overlay for account details and workspace preferences
+- `Settings` opens as a modal overlay for account details and portal preferences
 - The top-right menu opens account, settings, and log out actions
 - The simulator's Edit button opens [`../approval.html`](../approval.html), a reusable local approval page that accepts prefilled sender, message, and draft values.
 
@@ -42,9 +42,9 @@ Required environment variables on Render:
 
 - `PORTAL_MAIL_PROVIDER=resend`
 - `PORTAL_RESEND_API_KEY`
-- `PORTAL_RESEND_FROM_EMAIL`
-- `PORTAL_RESEND_FROM_NAME`
-- `PORTAL_PRODUCT_NAME` if you want a label other than `Workspace`
+- `PORTAL_RESEND_FROM_EMAIL` for a verified sender like `sign-in@yourdomain.com` or `Assistyca <sign-in@yourdomain.com>`
+- `PORTAL_RESEND_FROM_NAME` for the sender label shown in the inbox
+- `PORTAL_PRODUCT_NAME` for the sign-in email subject and product branding inside the email
 
 The `PORTAL_RESEND_API_KEY` and `PORTAL_RESEND_FROM_EMAIL` values should be added as secrets in the Render dashboard.
 

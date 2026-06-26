@@ -22,6 +22,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from email.utils import parseaddr
 from functools import partial
+from html import escape
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -31,7 +32,7 @@ from urllib import request as urllib_request
 
 
 EMAIL_RE = re.compile(r"^\S+@\S+\.\S+$")
-DEFAULT_PRODUCT_NAME = "Workspace"
+DEFAULT_PRODUCT_NAME = "Assistyca"
 DEFAULT_MAIL_PROVIDER = "smtp"
 DEFAULT_OTP_TTL_SECONDS = 10 * 60
 DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -336,23 +337,122 @@ def normalize_mail_provider(value: str) -> str:
     return DEFAULT_MAIL_PROVIDER
 
 
+def build_otp_email_subject(config: PortalConfig) -> str:
+    return f"{config.product_name} sign-in code"
+
+
+def otp_expiry_minutes(config: PortalConfig) -> int:
+    return max(1, (config.otp_ttl_seconds + 59) // 60)
+
+
 def build_otp_email_text(config: PortalConfig, code: str) -> str:
     return "\n".join(
         [
-            f"Your {config.product_name} sign-in code is {code}.",
+            f"Use this code to sign in to {config.product_name}:",
             "",
-            f"It expires in {max(1, config.otp_ttl_seconds // 60)} minutes.",
+            code,
             "",
-            "If you did not request this code, you can ignore this email.",
+            f"It expires in {otp_expiry_minutes(config)} minutes.",
             "",
-            f"Sent at {now_iso()}",
+            "If you did not request this code, you can safely ignore this email.",
         ]
     )
 
 
+def build_otp_email_html(config: PortalConfig, code: str) -> str:
+    product_name = escape(config.product_name)
+    otp_code = escape(code)
+    expiry_minutes = otp_expiry_minutes(config)
+    preheader = escape(
+        f"Your {config.product_name} sign-in code is {code}. It expires in {expiry_minutes} minutes."
+    )
+
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light only" />
+    <title>{product_name} sign-in code</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#eef4f4;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
+      {preheader}
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef4f4;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid #dce7e6;border-radius:28px;overflow:hidden;">
+            <tr>
+              <td style="padding:36px 32px 12px;text-align:center;">
+                <div style="display:inline-block;padding:8px 14px;border-radius:999px;background:#e8f5f2;color:#0f766e;font-family:Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">
+                  {product_name}
+                </div>
+                <h1 style="margin:20px 0 12px;color:#122230;font-family:Arial,sans-serif;font-size:32px;line-height:1.15;font-weight:800;">
+                  Your sign-in code
+                </h1>
+                <p style="margin:0;color:#566575;font-family:Arial,sans-serif;font-size:16px;line-height:1.6;">
+                  Enter this one-time code to continue into your workspace.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:20px 32px 8px;">
+                <div style="display:inline-block;min-width:260px;padding:18px 24px;border-radius:20px;background:#f5fbfa;border:1px solid #d9ece8;">
+                  <div style="color:#0f766e;font-family:Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">
+                    One-time code
+                  </div>
+                  <div style="margin-top:12px;color:#122230;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:42px;line-height:1.1;font-weight:700;letter-spacing:0.24em;">
+                    {otp_code}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 0;text-align:center;">
+                <p style="margin:0;color:#3f5362;font-family:Arial,sans-serif;font-size:16px;line-height:1.6;">
+                  This code expires in <strong>{expiry_minutes} minutes</strong>.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fbfb;border:1px solid #e4ecec;border-radius:18px;">
+                  <tr>
+                    <td style="padding:16px 18px;text-align:center;color:#647482;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">
+                      Email clients do not support reliable copy buttons, so the code is shown large for quick tap-and-copy.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 0;text-align:center;">
+                <p style="margin:0;color:#647482;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;">
+                  If you did not request this code, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px 36px;text-align:center;">
+                <p style="margin:0;color:#90a0ad;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;">
+                  Sent by {product_name}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+
+
 def build_otp_email(config: PortalConfig, email: str, code: str) -> EmailMessage:
     message = EmailMessage()
-    message["Subject"] = f"{config.product_name} sign-in code"
+    message["Subject"] = build_otp_email_subject(config)
     from_header = build_sender_header(config.smtp.from_name, config.smtp.from_email)
     if not from_header:
         raise RuntimeError("SMTP sender address is invalid. Set PORTAL_SMTP_FROM_EMAIL to a valid email address.")
@@ -360,6 +460,7 @@ def build_otp_email(config: PortalConfig, email: str, code: str) -> EmailMessage
     message["From"] = from_header
     message["To"] = email
     message.set_content(build_otp_email_text(config, code))
+    message.add_alternative(build_otp_email_html(config, code), subtype="html")
     return message
 
 
@@ -453,8 +554,9 @@ def send_otp_email_via_resend(config: PortalConfig, email: str, code: str) -> No
     payload = {
         "from": from_header,
         "to": [email],
-        "subject": f"{config.product_name} sign-in code",
+        "subject": build_otp_email_subject(config),
         "text": build_otp_email_text(config, code),
+        "html": build_otp_email_html(config, code),
     }
     body = json.dumps(payload).encode("utf-8")
     request = urllib_request.Request(
