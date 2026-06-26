@@ -203,6 +203,7 @@ a {
 .panel-intro h1 {
   max-width: 11ch;
   font-size: clamp(1.8rem, 2.9vw, 3rem);
+  color: #111b18;
 }
 
 .app-bar h2 {
@@ -826,8 +827,16 @@ a {
 
 .brand-block {
   grid-area: brand;
+  display: flex;
+  align-items: center;
   min-width: 0;
-  padding-top: 0.15rem;
+  padding-top: 0.05rem;
+}
+
+.brand-logo {
+  display: block;
+  height: clamp(1.9rem, 3vw, 2.3rem);
+  width: auto;
 }
 
 .tab-strip {
