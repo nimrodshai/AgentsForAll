@@ -417,17 +417,6 @@ def build_otp_email_html(config: PortalConfig, code: str) -> str:
               </td>
             </tr>
             <tr>
-              <td style="padding:20px 32px 0;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fbfb;border:1px solid #e4ecec;border-radius:18px;">
-                  <tr>
-                    <td style="padding:16px 18px;text-align:center;color:#647482;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">
-                      Email clients do not support reliable copy buttons, so the code is shown large for quick tap-and-copy.
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
               <td style="padding:20px 32px 0;text-align:center;">
                 <p style="margin:0;color:#647482;font-family:Arial,sans-serif;font-size:14px;line-height:1.7;">
                   If you did not request this code, you can safely ignore this email.
