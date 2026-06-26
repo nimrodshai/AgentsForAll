@@ -16,10 +16,27 @@ const PORTAL_API_BASE = resolvePortalApiBase();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const SETTINGS_PANEL_ANIMATION_MS = 320;
 const VALID_TABS = new Set(["features", "preview", "simulator", "settings"]);
-const TAB_ALIASES = new Map([["guidance", "features"]]);
+const TAB_ALIASES = new Map([
+  ["guidance", "features"],
+  ["tools", "features"],
+]);
+const TAB_LABELS = {
+  features: "Tools",
+  preview: "Preview",
+  simulator: "Simulator",
+  settings: "Settings",
+};
 const VALID_SETTINGS_MODES = new Set(["account", "preferences"]);
 const LOCAL_APPROVAL_URL = "../approval.html";
 const LOCAL_PORTAL_API_BASE = "http://127.0.0.1:8000";
+const LEGACY_DEFAULT_FEATURE_NAMES = new Set([
+  "WhatsApp Business Reply Suggestion Assistant",
+  "WhatsApp Reply Approval Bot",
+]);
+const LEGACY_DEFAULT_FEATURE_MODES = new Set([
+  "suggestion_only",
+  "Approval bot",
+]);
 
 const DEFAULT_PROMPT = {
   toneGuidance: "Warm, direct, and practical. Keep replies human, short, and grounded.",
@@ -46,11 +63,11 @@ const DEFAULT_SETTINGS = {
 const DEFAULT_FEATURES = [
   {
     id: "whatsapp-business-reply-suggestion-assistant",
-    name: "WhatsApp Reply Approval Bot",
+    name: "WhatsApp Reply Assistant",
     description:
-      "Drafts suggested replies, posts them to an internal approval bot, and opens a reusable approval page for revised approval.",
+      "Drafts suggested WhatsApp replies, keeps sending manual, and opens the reusable approval page when someone wants to review or revise the draft.",
     channel: "WhatsApp",
-    mode: "Approval bot",
+    mode: "Human-reviewed",
     status: "Active",
     approvalUrl: LOCAL_APPROVAL_URL,
     prompt: { ...DEFAULT_PROMPT },
@@ -89,7 +106,7 @@ function isLegacyWorkspaceName(value) {
 
 const SCENARIOS = {
   approval: {
-    label: "WhatsApp approval bot example",
+    label: "WhatsApp reply assistant example",
     sender: "Jim Hopper",
     user: "Hey, are you available today?",
     ask: "One sec, checking my calendar right now.",
@@ -675,16 +692,21 @@ function loadClientState(email) {
     : DEFAULT_FEATURES;
   const features = featuresSource.map((feature, index) => {
     const fallbackPrompt = index === 0 ? { ...DEFAULT_PROMPT, ...savedPrompt } : DEFAULT_PROMPT;
+    const featureId = String(feature?.id || "");
+    const featureName = String(feature?.name || "");
+    const featureMode = String(feature?.mode || "");
     const isLegacyDefaultFeature = index === 0
-      && String(feature?.id || "") === DEFAULT_FEATURES[0].id
-      && String(feature?.name || "") === "WhatsApp Business Reply Suggestion Assistant"
-      && String(feature?.mode || "") === "suggestion_only";
+      && featureId === DEFAULT_FEATURES[0].id
+      && (
+        LEGACY_DEFAULT_FEATURE_NAMES.has(featureName)
+        || LEGACY_DEFAULT_FEATURE_MODES.has(featureMode)
+      );
 
     return {
-      id: String(feature?.id || `feature-${index + 1}`),
+      id: featureId || `feature-${index + 1}`,
       name: isLegacyDefaultFeature
         ? DEFAULT_FEATURES[0].name
-        : String(feature?.name || `Feature ${index + 1}`),
+        : String(feature?.name || `Tool ${index + 1}`),
       description: isLegacyDefaultFeature
         ? DEFAULT_FEATURES[0].description
         : String(feature?.description || ""),
@@ -995,9 +1017,9 @@ function buildResponseText(prompt = getSelectedPrompt()) {
 function buildCompiledPrompt(feature = getSelectedFeature()) {
   const prompt = feature?.prompt || getSelectedPrompt();
   const lines = [
-    "Client feature draft",
+    "Client tool draft",
     "",
-    `Feature: ${feature?.name || "Unassigned feature"}`,
+    `Tool: ${feature?.name || "Unassigned tool"}`,
     `Channel: ${feature?.channel || "Web"}`,
     `Mode: ${feature?.mode || "Default"}`,
     "",
@@ -1530,7 +1552,7 @@ function updateHeader() {
     ? "Settings"
     : state.selectedFeatureId && selectedFeature
       ? selectedFeature.name
-      : capitalizeWords(state.activeTab);
+      : TAB_LABELS[state.activeTab] || capitalizeWords(state.activeTab);
   if (elements.workspaceTitle) {
     elements.workspaceTitle.textContent = workspaceName;
   }
@@ -1546,8 +1568,12 @@ function createFeatureCard(feature) {
   const card = document.createElement("button");
   card.type = "button";
   card.className = "glass-card feature-card feature-card-button";
-  card.setAttribute("aria-label", `Open ${feature.name} studio`);
+  card.setAttribute("aria-label", `Open ${feature.name}`);
   card.addEventListener("click", () => openFeatureStudio(feature.id));
+
+  const status = document.createElement("span");
+  status.className = "feature-status feature-card-status";
+  status.textContent = feature.status || "Active";
 
   const head = document.createElement("div");
   head.className = "feature-card-head";
@@ -1557,21 +1583,13 @@ function createFeatureCard(feature) {
   title.textContent = feature.name;
 
   titleBlock.append(title);
-
-  const status = document.createElement("span");
-  status.className = "feature-status";
-  status.textContent = feature.status || "Active";
-
-  head.append(titleBlock, status);
+  head.append(titleBlock);
 
   const description = document.createElement("p");
   description.className = "feature-card-copy";
   description.textContent = feature.description || "";
-  const action = document.createElement("span");
-  action.className = "feature-card-action";
-  action.textContent = "Open";
 
-  card.append(head, description, action);
+  card.append(status, head, description);
   return card;
 }
 
@@ -1583,10 +1601,10 @@ function updateFeatureList() {
     emptyState.className = "glass-card empty-state";
 
     const title = document.createElement("h3");
-    title.textContent = "No features assigned";
+    title.textContent = "No tools assigned";
 
     const copy = document.createElement("p");
-    copy.textContent = "Add a feature to this account before editing a prompt.";
+    copy.textContent = "Add a tool to this account before editing a prompt.";
 
     emptyState.append(title, copy);
     elements.featureList.replaceChildren(emptyState);

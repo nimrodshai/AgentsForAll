@@ -9,7 +9,7 @@
       content="Enter your email to receive a one-time code and continue into Assistyca."
     />
     <meta name="portal-api-base" content="" />
-    <link rel="stylesheet" href="./styles.css?v=27" />
+    <link rel="stylesheet" href="./styles.css?v=28" />
   </head>
   <body data-view="auth">
     <div class="orb orb-left" aria-hidden="true"></div>
@@ -152,7 +152,7 @@
         </div>
 
         <nav class="tab-strip" aria-label="Assistyca tabs">
-          <button class="tab-button is-active" data-tab="features" type="button">Features</button>
+          <button class="tab-button is-active" data-tab="features" type="button">Tools</button>
           <button class="tab-button" data-tab="preview" type="button">Preview</button>
           <button class="tab-button" data-tab="simulator" type="button">Simulator</button>
         </nav>
@@ -168,13 +168,14 @@
               id="accountMenuButton"
               class="menu-button"
               type="button"
+              aria-label="Account menu"
               aria-haspopup="menu"
               aria-expanded="false"
               aria-controls="accountMenu"
             >
               <span id="accountAvatar" class="avatar">DH</span>
               <span class="menu-copy">
-              <span class="menu-label">Account</span>
+                <span class="menu-label">Account</span>
                 <strong id="accountLabel">Signed out</strong>
               </span>
               <span class="menu-caret" aria-hidden="true">▾</span>
@@ -195,7 +196,7 @@
       <section id="featuresPanel" class="tab-panel">
         <div class="panel-intro">
           <div>
-            <h1>Features</h1>
+            <h1>Tools</h1>
           </div>
         </div>
 
@@ -206,16 +207,16 @@
         <header class="feature-page-header">
           <button id="backToFeaturesButton" class="feature-back-button" type="button">
             <span aria-hidden="true">&lt;</span>
-            <span>Back</span>
+            <span>Back to tools</span>
           </button>
           <span id="featureStudioStatus" class="feature-status">Active</span>
         </header>
 
         <div class="feature-page-intro">
-          <p class="eyebrow">Feature studio</p>
-          <h1 id="featureStudioTitle">Feature name</h1>
+          <p class="eyebrow">Tool studio</p>
+          <h1 id="featureStudioTitle">Tool name</h1>
           <p id="featureStudioDescription" class="feature-page-description">
-            Feature details appear here.
+            Tool details appear here.
           </p>
 
           <div class="feature-meta feature-page-meta">
@@ -345,7 +346,7 @@ Bad: 'Sure, anything is possible.'"
             <label class="field compact">
               <span>Test scenario</span>
               <select id="scenarioSelect">
-                <option value="approval">WhatsApp approval bot example</option>
+                <option value="approval">WhatsApp reply assistant example</option>
                 <option value="availability">New lead asking about availability</option>
                 <option value="pricing">Customer asking about price</option>
                 <option value="reschedule">Existing client wants to reschedule</option>
@@ -426,7 +427,7 @@ Bad: 'Sure, anything is possible.'"
             <label class="field compact">
               <span>Example scenario</span>
               <select id="simulatorPresetSelect">
-                <option value="approval">WhatsApp approval bot example</option>
+                <option value="approval">WhatsApp reply assistant example</option>
                 <option value="availability">New lead asking about availability</option>
                 <option value="pricing">Customer asking about price</option>
                 <option value="reschedule">Existing client wants to reschedule</option>
@@ -637,6 +638,6 @@ Owner said afternoons are easier."
       </section>
     </section>
 
-    <script src="./app.js?v=31"></script>
+    <script src="./app.js?v=32"></script>
   </body>
 </html>
