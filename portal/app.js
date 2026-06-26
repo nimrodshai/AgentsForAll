@@ -1876,6 +1876,20 @@ function setOtpDigits(value) {
   return digits;
 }
 
+function applyOtpDigits(value) {
+  const digits = setOtpDigits(value);
+
+  if (!digits) {
+    return false;
+  }
+
+  if (!maybeAutoVerifyOtp()) {
+    focusOtpDigit(Math.min(digits.length, elements.otpDigits.length - 1));
+  }
+
+  return true;
+}
+
 function maybeAutoVerifyOtp() {
   if (authBusy || !authChallenge?.email) {
     return false;
@@ -1923,6 +1937,12 @@ function handleOtpDigitInput(event) {
     return;
   }
 
+  const replacementDigits = String(event.data || "").replace(/\D/g, "");
+  if (replacementDigits.length > 1) {
+    applyOtpDigits(replacementDigits);
+    return;
+  }
+
   const digits = String(digitInput.value || "").replace(/\D/g, "");
 
   if (!digits) {
@@ -1931,10 +1951,7 @@ function handleOtpDigitInput(event) {
   }
 
   if (digits.length > 1) {
-    setOtpDigits(digits);
-    if (!maybeAutoVerifyOtp()) {
-      focusOtpDigit(Math.min(digits.length, elements.otpDigits.length - 1));
-    }
+    applyOtpDigits(digits);
     return;
   }
 
@@ -1945,6 +1962,21 @@ function handleOtpDigitInput(event) {
   if (!didAutoVerify && index < elements.otpDigits.length - 1) {
     focusOtpDigit(index + 1);
   }
+}
+
+function handleOtpDigitBeforeInput(event) {
+  if (authBusy || !authChallenge?.email) {
+    return;
+  }
+
+  const incomingDigits = String(event.data || "").replace(/\D/g, "");
+
+  if (incomingDigits.length <= 1) {
+    return;
+  }
+
+  event.preventDefault();
+  applyOtpDigits(incomingDigits);
 }
 
 function handleOtpDigitKeydown(event) {
@@ -1993,10 +2025,7 @@ function handleOtpDigitPaste(event) {
   }
 
   event.preventDefault();
-  setOtpDigits(pasted);
-  if (!maybeAutoVerifyOtp()) {
-    focusOtpDigit(Math.min(pasted.length, elements.otpDigits.length) - 1);
-  }
+  applyOtpDigits(pasted);
 }
 
 function handlePrimaryAuthAction() {
@@ -2446,6 +2475,7 @@ function bindEvents() {
   });
 
   for (const digitInput of elements.otpDigits) {
+    digitInput.addEventListener("beforeinput", handleOtpDigitBeforeInput);
     digitInput.addEventListener("input", handleOtpDigitInput);
     digitInput.addEventListener("keydown", handleOtpDigitKeydown);
     digitInput.addEventListener("paste", handleOtpDigitPaste);
